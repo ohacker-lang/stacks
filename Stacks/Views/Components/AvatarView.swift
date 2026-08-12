@@ -3,10 +3,15 @@ import SwiftUI
 struct AvatarView: View {
     let profile: UserProfile
     var size: CGFloat = 44
+    var localImageData: Data? = nil
 
     var body: some View {
         Group {
-            if let avatarURL = profile.avatarURL {
+            if let localImageData, let image = UIImage(data: localImageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let avatarURL = profile.avatarURL {
                 AsyncImage(url: avatarURL) { phase in
                     switch phase {
                     case .success(let image):

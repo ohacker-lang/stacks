@@ -14,7 +14,8 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: 28) {
                 HStack(alignment: .center) {
                     Text("Discover")
-                        .font(.stacksDisplay(size: 44, weight: .bold))
+                        .font(.stacksHeader(size: 44))
+                        .tracking(-0.35)
                         .foregroundStyle(Color.stacksInk)
 
                     Spacer()
@@ -59,7 +60,8 @@ struct DiscoverView: View {
     private var savedStacks: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Saved")
-                .font(.stacksText(size: 20, weight: .bold))
+                .font(.stacksHeader(size: 20))
+                .tracking(-0.25)
                 .foregroundStyle(Color.stacksInk)
 
             LazyVStack(spacing: 16) {
@@ -75,7 +77,8 @@ struct DiscoverView: View {
     private var stackFeed: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Stacks")
-                .font(.stacksText(size: 20, weight: .bold))
+                .font(.stacksHeader(size: 20))
+                .tracking(-0.25)
                 .foregroundStyle(Color.stacksInk)
 
             if viewModel.isLoading {
@@ -111,7 +114,8 @@ struct DiscoverView: View {
     private var suggestedCreators: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Suggested Users")
-                .font(.stacksText(size: 20, weight: .bold))
+                .font(.stacksHeader(size: 20))
+                .tracking(-0.25)
                 .foregroundStyle(Color.stacksInk)
 
             ForEach(viewModel.suggestedCreators) { creator in
@@ -123,10 +127,12 @@ struct DiscoverView: View {
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(creator.displayName)
-                                .font(.stacksText(size: 17, weight: .bold))
+                                .font(.stacksHeader(size: 17))
+                                .tracking(-0.2)
                                 .foregroundStyle(Color.stacksInk)
                             Text("@\(creator.username)")
-                                .font(.stacksText(size: 14, weight: .medium))
+                                .font(.stacksText(size: 14))
+                                .tracking(-0.15)
                                 .foregroundStyle(Color.stacksMutedInk)
                         }
 
@@ -182,10 +188,12 @@ private struct DiscoverStackRow: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(stack.displayTitle)
-                        .font(.stacksDisplay(size: 26, weight: .bold))
+                        .font(.stacksHeader(size: 26))
+                        .tracking(-0.3)
                         .foregroundStyle(Color.stacksInk)
                     Text("@\(stack.author.username) • \(stack.items.count) items")
-                        .font(.stacksText(size: 14, weight: .medium))
+                        .font(.stacksText(size: 14))
+                        .tracking(-0.15)
                         .foregroundStyle(Color.stacksMutedInk)
                 }
 
@@ -203,7 +211,8 @@ private struct DiscoverStackRow: View {
 
                     Button(action: onFollow) {
                         Text(stack.isFollowingAuthor ? "Following" : "Follow")
-                            .font(.stacksText(size: 14, weight: .bold))
+                            .font(.stacksHeader(size: 14))
+                            .tracking(-0.15)
                             .foregroundStyle(stack.isFollowingAuthor ? Color.stacksInk : .white)
                             .padding(.horizontal, 14)
                             .frame(height: 42)
@@ -230,6 +239,7 @@ private struct DiscoverSearchField: View {
 
             TextField("Username or Stack title", text: $query)
                 .font(.stacksText(size: 17))
+                .tracking(-0.15)
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
                 .onSubmit(onSubmit)
@@ -280,12 +290,14 @@ private struct SavedStackScrollCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stack.displayTitle)
-                            .font(.stacksDisplay(size: 25, weight: .bold))
+                            .font(.stacksHeader(size: 25))
+                            .tracking(-0.3)
                             .foregroundStyle(Color.stacksInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                         Text("@\(stack.author.username)")
-                            .font(.stacksText(size: 14, weight: .medium))
+                            .font(.stacksText(size: 14))
+                            .tracking(-0.15)
                             .foregroundStyle(Color.stacksMutedInk)
                     }
 

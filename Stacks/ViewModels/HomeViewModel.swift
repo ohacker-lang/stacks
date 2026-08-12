@@ -4,7 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class HomeViewModel {
-    var stacks: [Stack] = []
+    var myStacks: [Stack] = []
+    var discoverStacks: [Stack] = []
     var isLoading = false
     var errorMessage: String?
     var createTitle = ""
@@ -14,7 +15,12 @@ final class HomeViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            stacks = try await services.stacks.fetchMyStacks(for: user.id)
+            async let fetchedStacks = services.stacks.fetchMyStacks(for: user.id)
+            async let discoveredStacks = services.stacks.fetchDiscoverStacks(query: nil)
+
+            let (myStacks, discoverStacks) = try await (fetchedStacks, discoveredStacks)
+            self.myStacks = myStacks.sorted { $0.updatedAt > $1.updatedAt }
+            self.discoverStacks = discoverStacks.sorted { $0.updatedAt > $1.updatedAt }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -28,7 +34,7 @@ final class HomeViewModel {
                 wishlistMode: createWishlistMode,
                 owner: user
             )
-            stacks.insert(stack, at: 0)
+            myStacks.insert(stack, at: 0)
             createTitle = ""
             createWishlistMode = false
             services.haptics.notification(.success)

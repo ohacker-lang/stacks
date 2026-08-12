@@ -106,6 +106,78 @@ final class StackDetailViewModel {
         }
     }
 
+    func copyStack(to owner: UserProfile, services: AppServices) async -> Stack? {
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            let copiedStack = try await services.stacks.copyStack(stack, to: owner)
+
+            services.haptics.notification(.success)
+            return copiedStack
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+            return nil
+        }
+    }
+
+    func updatePlacement(
+        for itemID: UUID,
+        placement: StickerPlacement,
+        services: AppServices
+    ) async {
+        guard let index = stack.items.firstIndex(where: { $0.id == itemID }) else { return }
+
+        stack.items[index].placement = placement
+        stack.items[index].hasCustomPlacement = true
+
+        do {
+            stack = try await services.stacks.updateItem(stack.items[index], in: stack.id)
+            services.haptics.impact(.light)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func toggleProductBookmark(for itemID: UUID, services: AppServices) async {
+        guard let index = stack.items.firstIndex(where: { $0.id == itemID }) else { return }
+
+        stack.items[index].isBookmarked = !(stack.items[index].isBookmarked ?? false)
+
+        do {
+            stack = try await services.stacks.updateItem(stack.items[index], in: stack.id)
+            services.haptics.impact(.light)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func transfer(
+        itemID: UUID,
+        to destination: Stack,
+        removingOriginal: Bool,
+        services: AppServices
+    ) async {
+        guard let item = stack.items.first(where: { $0.id == itemID }) else { return }
+
+        var transferredItem = item
+        transferredItem.stackID = destination.id
+
+        do {
+            _ = try await services.stacks.addItem(transferredItem, to: destination.id)
+            if removingOriginal {
+                stack = try await services.stacks.removeItem(id: itemID, from: stack.id)
+            }
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
     private func completeBackgroundRemoval(for item: StackItem, services: AppServices) async {
         do {
             let removedURL = try await services.backgroundRemoval.removeBackground(for: item)

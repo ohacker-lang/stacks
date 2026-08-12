@@ -43,6 +43,12 @@ actor MockAuthService: AuthService {
     func signOut() async throws {
         session = nil
     }
+
+    func requestAccountDeletion() async throws {
+        // The demo service has no remote data, so deleting the mock account
+        // simply invalidates the local session.
+        session = nil
+    }
 }
 
 actor MockStackRepository: StackRepository {
@@ -98,6 +104,48 @@ actor MockStackRepository: StackRepository {
         return stack
     }
 
+    func copyStack(_ stack: Stack, to owner: UserProfile) async throws -> Stack {
+        let copiedStackID = UUID()
+        let copiedItems = stack.items.map { item in
+            StackItem(
+                id: UUID(),
+                stackID: copiedStackID,
+                title: item.title,
+                brand: item.brand,
+                shortDescription: item.shortDescription,
+                price: item.price,
+                currencyCode: item.currencyCode,
+                sourceURL: item.sourceURL,
+                buyURL: item.buyURL,
+                affiliateURL: item.affiliateURL,
+                originalImageURL: item.originalImageURL,
+                removedBackgroundImageURL: item.removedBackgroundImageURL,
+                removalStatus: item.removalStatus,
+                placement: item.placement,
+                addSource: item.addSource,
+                claimStatus: nil,
+                demoGlyph: item.demoGlyph
+            )
+        }
+        let copy = Stack(
+            id: copiedStackID,
+            ownerID: owner.id,
+            author: owner,
+            title: stack.title,
+            summary: stack.summary,
+            visibility: .private,
+            wishlistMode: stack.wishlistMode,
+            collaborators: [],
+            items: copiedItems,
+            createdAt: Date(),
+            updatedAt: Date(),
+            isBookmarked: false,
+            isFollowingAuthor: false
+        )
+        myStacks.insert(copy, at: 0)
+        return copy
+    }
+
     func addItem(_ item: StackItem, to stackID: UUID) async throws -> Stack {
         guard let index = myStacks.firstIndex(where: { $0.id == stackID }) else {
             throw AppError.notFound
@@ -123,6 +171,17 @@ actor MockStackRepository: StackRepository {
         }
 
         throw AppError.notFound
+    }
+
+    func removeItem(id: UUID, from stackID: UUID) async throws -> Stack {
+        guard let stackIndex = myStacks.firstIndex(where: { $0.id == stackID }),
+              let itemIndex = myStacks[stackIndex].items.firstIndex(where: { $0.id == id }) else {
+            throw AppError.notFound
+        }
+
+        myStacks[stackIndex].items.remove(at: itemIndex)
+        myStacks[stackIndex].updatedAt = Date()
+        return myStacks[stackIndex]
     }
 
     func toggleBookmark(stackID: UUID, userID: UUID) async throws -> Stack {
@@ -211,26 +270,28 @@ actor MockProductSearchService: ProductSearchService {
         ]
     }
 
+    func previewProductLink(_ url: URL) async throws -> ProductLinkPreview {
+        guard url.scheme?.hasPrefix("http") == true else { throw AppError.invalidURL }
+        return await ProductPageImageExtractor.previewProductLink(for: url)
+    }
+
     func productFromPastedLink(_ url: URL, stackID: UUID, placement: StickerPlacement) async throws -> StackItem {
         guard url.scheme?.hasPrefix("http") == true else {
             throw AppError.invalidURL
         }
-        try await Task.sleep(for: .milliseconds(350))
-
-        let title = (url.host ?? "Linked Find").replacingOccurrences(of: "www.", with: "").capitalized
-        let productImageURL = await ProductPageImageExtractor.bestProductImageURL(for: url)
+        let preview = await ProductPageImageExtractor.previewProductLink(for: url)
         return StackItem(
             id: UUID(),
             stackID: stackID,
-            title: title,
-            brand: "Linked Product",
-            shortDescription: "A linked find pulled into your Stack, ready for a background-removed product image.",
-            price: 48,
-            currencyCode: "USD",
+            title: preview.title,
+            brand: preview.brand,
+            shortDescription: preview.shortDescription,
+            price: preview.price ?? 0,
+            currencyCode: preview.currencyCode,
             sourceURL: url,
             buyURL: url,
             affiliateURL: nil,
-            originalImageURL: productImageURL ?? DemoProductImageCatalog.url(for: title),
+            originalImageURL: preview.imageURL,
             removedBackgroundImageURL: nil,
             removalStatus: .processing,
             placement: placement,

@@ -54,6 +54,10 @@
 		A0000000000000000000002D /* PendingSharedLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* PendingSharedLinkStore.swift */; };
 		A0000000000000000000002E /* StacksShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B00000000000000000000032 /* StacksShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A0000000000000000000002F /* ProductPageImageExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* ProductPageImageExtractor.swift */; };
+		A00000000000000000000030 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000034 /* ProfileViewModel.swift */; };
+		A00000000000000000000031 /* InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000035 /* InstrumentSerif-Regular.ttf */; };
+		A00000000000000000000032 /* AddProductFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000036 /* AddProductFlowView.swift */; };
+		A00000000000000000000033 /* WinkyRough-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000037 /* WinkyRough-Black.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -139,6 +143,10 @@
 		B00000000000000000000031 /* StacksShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "StacksShareExtension.entitlements"; sourceTree = "<group>"; };
 		B00000000000000000000032 /* StacksShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "StacksShareExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B00000000000000000000033 /* ProductPageImageExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/ProductPageImageExtractor.swift"; sourceTree = "<group>"; };
+		B00000000000000000000034 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/ProfileViewModel.swift"; sourceTree = "<group>"; };
+		B00000000000000000000035 /* InstrumentSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/InstrumentSerif-Regular.ttf"; sourceTree = "<group>"; };
+		B00000000000000000000036 /* AddProductFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Add/AddProductFlowView.swift"; sourceTree = "<group>"; };
+		B00000000000000000000037 /* WinkyRough-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/WinkyRough-Black.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -182,6 +190,7 @@
 				B0000000000000000000000F /* AppSession.swift */,
 				B00000000000000000000010 /* DiscoverViewModel.swift */,
 				B00000000000000000000011 /* HomeViewModel.swift */,
+				B00000000000000000000034 /* ProfileViewModel.swift */,
 				B00000000000000000000012 /* StackDetailViewModel.swift */,
 				B00000000000000000000013 /* Color+Stacks.swift */,
 				B00000000000000000000014 /* Date+Stacks.swift */,
@@ -204,7 +213,10 @@
 				B00000000000000000000024 /* AddItemSheets.swift */,
 				B0000000000000000000002D /* PendingSharedLinkSheet.swift */,
 				B00000000000000000000025 /* StackDetailView.swift */,
+				B00000000000000000000036 /* AddProductFlowView.swift */,
 				B00000000000000000000026 /* Assets.xcassets */,
+				B00000000000000000000035 /* InstrumentSerif-Regular.ttf */,
+				B00000000000000000000037 /* WinkyRough-Black.ttf */,
 			);
 			path = "Stacks";
 			sourceTree = "<group>";
@@ -338,6 +350,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000026 /* Assets.xcassets in Resources */,
+				A00000000000000000000031 /* InstrumentSerif-Regular.ttf in Resources */,
+				A00000000000000000000033 /* WinkyRough-Black.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -380,6 +394,7 @@
 				A0000000000000000000000F /* AppSession.swift in Sources */,
 				A00000000000000000000010 /* DiscoverViewModel.swift in Sources */,
 				A00000000000000000000011 /* HomeViewModel.swift in Sources */,
+				A00000000000000000000030 /* ProfileViewModel.swift in Sources */,
 				A00000000000000000000012 /* StackDetailViewModel.swift in Sources */,
 				A00000000000000000000013 /* Color+Stacks.swift in Sources */,
 				A00000000000000000000014 /* Date+Stacks.swift in Sources */,
@@ -402,6 +417,7 @@
 				A00000000000000000000024 /* AddItemSheets.swift in Sources */,
 				A0000000000000000000002A /* PendingSharedLinkSheet.swift in Sources */,
 				A00000000000000000000025 /* StackDetailView.swift in Sources */,
+				A00000000000000000000032 /* AddProductFlowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -567,6 +583,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stacks;
+				INFOPLIST_KEY_UIAppFonts = (
+					"InstrumentSerif-Regular.ttf",
+					"WinkyRough-Black.ttf",
+				);
 				INFOPLIST_KEY_CFBundleURLTypes = (
 					{
 						CFBundleURLName = "com.example.stacks";
@@ -577,6 +597,8 @@
 				);
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
+				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
+				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -609,6 +631,10 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stacks;
+				INFOPLIST_KEY_UIAppFonts = (
+					"InstrumentSerif-Regular.ttf",
+					"WinkyRough-Black.ttf",
+				);
 				INFOPLIST_KEY_CFBundleURLTypes = (
 					{
 						CFBundleURLName = "com.example.stacks";
@@ -619,6 +645,8 @@
 				);
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
+				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
+				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

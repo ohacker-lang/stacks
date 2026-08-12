@@ -31,13 +31,13 @@ struct MockSeedData: Sendable {
 
     var myStacks: [Stack] {
         [
-            makeReferenceStack(owner: currentUser, title: "Hello", isMine: true),
+            makeReferenceStack(owner: currentUser, title: "Summer", isMine: true),
             Stack(
                 id: UUID(uuidString: "80DAB29E-6623-4D5F-82F8-3486808DE7A0")!,
                 ownerID: currentUserID,
                 author: currentUser,
                 title: "Desk Dreams",
-                summary: "The small things that make work feel smoother.",
+                summary: "Work Mode",
                 visibility: .publicDiscover,
                 wishlistMode: false,
                 collaborators: [],
@@ -52,13 +52,13 @@ struct MockSeedData: Sendable {
 
     var discoverStacks: [Stack] {
         [
-            makeReferenceStack(owner: isabella, title: "Hello", isMine: false),
+            makeReferenceStack(owner: isabella, title: "Summer", isMine: false),
             Stack(
                 id: UUID(uuidString: "2F51A9C0-CFF0-4AEF-AD81-8139BFA33FC1")!,
                 ownerID: isabellaID,
                 author: isabella,
                 title: "Good Luck Charms",
-                summary: "Tiny things with strange confidence.",
+                summary: "Lucky Things",
                 visibility: .publicDiscover,
                 wishlistMode: true,
                 collaborators: [],
@@ -77,7 +77,7 @@ struct MockSeedData: Sendable {
             ownerID: owner.id,
             author: owner,
             title: title,
-            summary: "A white canvas of background-removed stickers.",
+            summary: "The Creative",
             visibility: .publicDiscover,
             wishlistMode: false,
             collaborators: [],
@@ -91,17 +91,18 @@ struct MockSeedData: Sendable {
 
     private func referenceItems(stackID: UUID) -> [StackItem] {
         [
-            item(stackID: stackID, title: "Brooklyn Ball", brand: "Neighborhood Goods", price: 68, glyph: "🏀", x: 0.74, y: 0.11, scale: 1.25, rotation: -4, description: "A little courtside mythology, polished into a collectible that looks better floating than sitting still."),
-            item(stackID: stackID, title: "Endless Illusion Patch", brand: "Studio Tape", price: 24, glyph: "🎟️", x: 0.35, y: 0.16, scale: 0.74, rotation: -2, description: "A wavy yellow banner with the kind of slogan that feels discovered, not designed."),
-            item(stackID: stackID, title: "Tiny Banana Walker", brand: "Fruit Stand", price: 18, glyph: "🍌", x: 0.67, y: 0.32, scale: 0.72, rotation: 7, description: "Cheerfully strange, deeply unnecessary, and somehow exactly the thing the stack needed."),
-            item(stackID: stackID, title: "Little Donkey", brand: "Pocket Zoo", price: 31, glyph: "🫏", x: 0.25, y: 0.32, scale: 0.88, rotation: -8, description: "A tiny character with enough attitude to hold a whole corner of the canvas."),
-            item(stackID: stackID, title: "Live Laugh Dale Plate", brand: "Garage Sale", price: 42, glyph: "▬", x: 0.38, y: 0.47, scale: 0.9, rotation: -3, description: "A small black plate with a very specific energy and absolutely no interest in explaining itself."),
-            item(stackID: stackID, title: "Score Button", brand: "Match Day", price: 12, glyph: "🔴", x: 0.75, y: 0.52, scale: 1.0, rotation: 2, description: "A badge for the heartbreak, the optimism, and the group chat afterward."),
-            item(stackID: stackID, title: "Toy Head", brand: "Brick Bureau", price: 26, glyph: "🧱", x: 0.65, y: 0.67, scale: 0.82, rotation: 4, description: "A blocky little frown that says more about taste than a smile ever could."),
-            item(stackID: stackID, title: "Driver License Card", brand: "Novelty Office", price: 17, glyph: "💳", x: 0.35, y: 0.72, scale: 1.0, rotation: -6, description: "A fake credential for a real sense of humor, crisp enough to earn its own shadow."),
-            item(stackID: stackID, title: "Serious Man", brand: "Moodboard Supply", price: 54, glyph: "🕴️", x: 0.26, y: 0.88, scale: 1.08, rotation: -5, description: "All business, all sticker, and somehow the least practical purchase here."),
-            item(stackID: stackID, title: "Happy Banana", brand: "Fruit Stand", price: 20, glyph: "🍌", x: 0.48, y: 0.86, scale: 0.88, rotation: 10, description: "A gentler banana, clearly here for morale and not logistics."),
-            item(stackID: stackID, title: "Take It Easy Patch", brand: "Slow Goods", price: 29, glyph: "🐢", x: 0.73, y: 0.9, scale: 0.94, rotation: -7, description: "A soft reminder with sticker-shop confidence and a perfect amount of wobble.")
+            item(stackID: stackID, title: "Graphic T-Shirt", brand: "Studio Summer", price: 68, glyph: "", x: 0.12, y: 0.12, scale: 1.05, rotation: -3, description: "A bright cotton tee for the start of the season."),
+            item(stackID: stackID, title: "Gallery Tee", brand: "Studio Summer", price: 72, glyph: "", x: 0.37, y: 0.12, scale: 1.0, rotation: 1, description: "A softer white tee with a framed print."),
+            item(stackID: stackID, title: "Denim Shorts", brand: "Studio Summer", price: 94, glyph: "", x: 0.62, y: 0.12, scale: 1.08, rotation: -2, description: "Easy denim with the right amount of wear."),
+            item(stackID: stackID, title: "Charcoal Sweatshirt", brand: "Studio Summer", price: 128, glyph: "", x: 0.87, y: 0.12, scale: 1.06, rotation: 2, description: "A dark layer for cold evenings."),
+            item(stackID: stackID, title: "Puffer Jacket", brand: "Studio Summer", price: 180, glyph: "", x: 0.12, y: 0.39, scale: 1.08, rotation: -2, description: "A graphic jacket that carries a full look."),
+            item(stackID: stackID, title: "Black Trench", brand: "Studio Summer", price: 210, glyph: "", x: 0.37, y: 0.39, scale: 1.05, rotation: 1, description: "A long black layer with easy structure."),
+            item(stackID: stackID, title: "Patterned Jacket", brand: "Studio Summer", price: 198, glyph: "", x: 0.62, y: 0.39, scale: 1.06, rotation: -1, description: "A bold layer with a little texture."),
+            item(stackID: stackID, title: "Slip Dress", brand: "Studio Summer", price: 118, glyph: "", x: 0.87, y: 0.39, scale: 1.02, rotation: 2, description: "A simple dress for late dinners."),
+            item(stackID: stackID, title: "White Robe", brand: "Studio Summer", price: 142, glyph: "", x: 0.12, y: 0.66, scale: 1.03, rotation: -1, description: "Soft cotton for slower mornings."),
+            item(stackID: stackID, title: "Black Robe", brand: "Studio Summer", price: 142, glyph: "", x: 0.37, y: 0.66, scale: 1.03, rotation: 1, description: "The dark version, equally easy."),
+            item(stackID: stackID, title: "Red Sneaker", brand: "Studio Summer", price: 96, glyph: "", x: 0.62, y: 0.66, scale: 1.02, rotation: -2, description: "A red sneaker to break up the neutrals."),
+            item(stackID: stackID, title: "Black Tote Bag", brand: "Studio Summer", price: 154, glyph: "", x: 0.87, y: 0.66, scale: 1.06, rotation: 1, description: "A carryall that keeps the rest together.")
         ]
     }
 

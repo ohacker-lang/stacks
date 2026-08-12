@@ -3,69 +3,111 @@ import SwiftUI
 struct PendingSharedLinkSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appServices) private var services
+
     @State private var stacks: [Stack] = []
-    @State private var isLoading = true
-    @State private var isSaving = false
+    @State private var selectedStack: Stack?
+    @State private var newStackTitle = ""
+    @State private var newStackWishlistMode = false
+    @State private var isLoadingStacks = true
+    @State private var isCreatingStack = false
+    @State private var isPresentingNewStack = false
+    @State private var isPresentingDiscardConfirmation = false
     @State private var errorMessage: String?
 
     let link: PendingSharedLink
     let user: UserProfile
     let onSaved: (Stack) -> Void
+    let onDeferred: () -> Void
+    let onDiscarded: () -> Void
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Shared link") {
+                Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(link.title ?? link.url.host ?? "Product link")
-                            .font(.headline)
-                        Text(link.url.absoluteString)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        Text("What do you want to do with this link?")
+                            .font(.stacksHeader(size: 22))
+                            .tracking(-0.4)
+                            .foregroundStyle(Color.stacksInk)
+
+                        Text("Choose where to put it before continuing.")
+                            .font(.stacksText(size: 15, weight: .regular))
+                            .foregroundStyle(Color.stacksMutedInk)
+                            .padding(.bottom, 8)
+
+                        Text(link.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? link.title! : link.url.host ?? "Shared link")
+                            .font(.stacksText(size: 17))
+                            .foregroundStyle(Color.stacksInk)
                             .lineLimit(2)
+                        Text(link.url.host ?? link.url.absoluteString)
+                            .font(.stacksText(size: 14))
+                            .foregroundStyle(Color.stacksMutedInk)
+                            .lineLimit(1)
                     }
+                    .padding(.vertical, 4)
                 }
 
-                Section("Save to Stack") {
-                    if isLoading {
-                        ProgressView("Loading Stacks")
-                    } else if stacks.isEmpty {
-                        ContentUnavailableView("No Stacks yet", systemImage: "square.stack.3d.up", description: Text("Create a Stack first, then share links into it."))
+                Section("Add to a Stack") {
+                    if isLoadingStacks {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("Loading your Stacks")
+                                .font(.stacksText(size: 16))
+                        }
                     } else {
                         ForEach(stacks) { stack in
                             Button {
-                                save(to: stack)
+                                selectedStack = stack
                             } label: {
                                 HStack {
                                     Text(stack.displayTitle)
+                                        .font(.stacksText(size: 18))
+                                        .foregroundStyle(Color.stacksInk)
                                     Spacer()
-                                    if isSaving {
-                                        ProgressView()
-                                    } else {
-                                        Image(systemName: "plus.circle")
-                                            .foregroundStyle(Color.stacksInk)
-                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .regular))
+                                        .foregroundStyle(Color.stacksMutedInk)
                                 }
                             }
-                            .disabled(isSaving)
+                        }
+
+                        Button {
+                            isPresentingNewStack = true
+                        } label: {
+                            Label("New Stack", systemImage: "plus")
+                                .font(.stacksText(size: 17))
                         }
                     }
                 }
             }
-            .navigationTitle("Save to Stacks")
+            .navigationTitle("Shared Link")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        PendingSharedLinkStore.clear()
-                        dismiss()
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(role: .destructive) {
+                        isPresentingDiscardConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
                     }
+                    .accessibilityLabel("Discard shared link")
                 }
             }
             .task {
                 await loadStacks()
             }
-            .alert("Could not save link", isPresented: Binding(
+            .sheet(isPresented: $isPresentingNewStack) {
+                newStackSheet
+            }
+            .confirmationDialog("Discard this shared link?", isPresented: $isPresentingDiscardConfirmation, titleVisibility: .visible) {
+                Button("Discard Link", role: .destructive) {
+                    PendingSharedLinkStore.remove(link)
+                    onDiscarded()
+                    dismiss()
+                }
+            } message: {
+                Text("This removes the link from your pending Stacks imports.")
+            }
+            .alert("Could not create Stack", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
@@ -74,38 +116,76 @@ struct PendingSharedLinkSheet: View {
                 Text(errorMessage ?? "")
             }
         }
-        .presentationDetents([.medium, .large])
+        .fullScreenCover(item: $selectedStack) { stack in
+            ProductLinkImportSheet(
+                initialURL: link.url,
+                user: user,
+                preferredStack: stack,
+                locksDestination: true
+            ) { savedStack in
+                PendingSharedLinkStore.remove(link)
+                onSaved(savedStack)
+                dismiss()
+            }
+        }
+    }
+
+    private var newStackSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Stack") {
+                    TextField("Title", text: $newStackTitle)
+                        .textInputAutocapitalization(.words)
+                        .textContentType(.name)
+                    Toggle("Wishlist mode", isOn: $newStackWishlistMode)
+                }
+            }
+            .navigationTitle("New Stack")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isPresentingNewStack = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        createStack()
+                    }
+                    .disabled(isCreatingStack || newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
     }
 
     private func loadStacks() async {
-        isLoading = true
-        defer { isLoading = false }
+        isLoadingStacks = true
+        defer { isLoadingStacks = false }
         do {
-            stacks = try await services.stacks.fetchMyStacks(for: user.id)
+            let loadedStacks = try await services.stacks.fetchMyStacks(for: user.id)
+            stacks = loadedStacks.sorted { $0.updatedAt > $1.updatedAt }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    private func save(to stack: Stack) {
-        guard !isSaving else { return }
-        isSaving = true
+    private func createStack() {
+        guard !isCreatingStack else { return }
+        isCreatingStack = true
+        let title = newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+
         Task {
+            defer { isCreatingStack = false }
             do {
-                let item = try await services.productSearch.productFromPastedLink(
-                    link.url,
-                    stackID: stack.id,
-                    placement: StickerPlacement(xRatio: 0.5, yRatio: 0.32, scale: 1, rotationDegrees: -4)
+                let stack = try await services.stacks.createStack(
+                    title: title,
+                    wishlistMode: newStackWishlistMode,
+                    owner: user
                 )
-                let updated = try await services.stacks.addItem(item, to: stack.id)
-                PendingSharedLinkStore.clear()
                 services.haptics.notification(.success)
-                isSaving = false
-                dismiss()
-                onSaved(updated)
+                isPresentingNewStack = false
+                selectedStack = stack
             } catch {
-                isSaving = false
                 errorMessage = error.localizedDescription
                 services.haptics.notification(.error)
             }

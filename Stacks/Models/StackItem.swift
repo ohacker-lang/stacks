@@ -15,9 +15,13 @@ struct StackItem: Identifiable, Codable, Hashable, Sendable {
     var removedBackgroundImageURL: URL?
     var removalStatus: BackgroundRemovalStatus
     var placement: StickerPlacement
+    /// `nil` preserves legacy/template placement. `true` means the member has
+    /// deliberately arranged this sticker on the editorial canvas.
+    var hasCustomPlacement: Bool? = nil
     var addSource: AddItemSource
     var claimStatus: GiftClaimStatus?
     var demoGlyph: String?
+    var isBookmarked: Bool? = nil
 
     var purchaseURL: URL {
         affiliateURL ?? buyURL
@@ -55,14 +59,17 @@ enum BackgroundRemovalStatus: String, Codable, CaseIterable, Hashable, Sendable 
 enum AddItemSource: String, Codable, CaseIterable, Hashable, Sendable {
     case search
     case pastedLink
+    case camera
+    case photoLibrary
     case manualPhoto
 
     var title: String {
         switch self {
         case .search: "Search"
         case .pastedLink: "Paste Link"
-        case .manualPhoto: "Take Picture"
+        case .camera: "Take Picture"
+        case .photoLibrary: "Camera Roll"
+        case .manualPhoto: "Add Manually"
         }
     }
 }
-

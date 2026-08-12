@@ -13,7 +13,6 @@ struct GlassCircleButton: View {
                 .font(.system(size: iconSize, weight: .semibold))
                 .foregroundStyle(Color.stacksInk)
                 .frame(width: size, height: size)
-                .background(Color.black.opacity(0.055), in: Circle())
                 .stacksGlass(cornerRadius: size / 2, interactive: true)
         }
         .buttonStyle(.plain)

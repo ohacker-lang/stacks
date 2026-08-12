@@ -91,4 +91,24 @@ final class AppSession {
             lastError = error.localizedDescription
         }
     }
+
+    func updateCurrentProfile(displayName: String, username: String) {
+        guard case .signedIn(var profile) = state else { return }
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let handle = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !handle.isEmpty else { return }
+        profile.displayName = name
+        profile.username = handle
+        state = .signedIn(profile)
+    }
+
+    func requestAccountDeletion() async {
+        do {
+            try await services.auth.requestAccountDeletion()
+            state = .signedOut
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
 }

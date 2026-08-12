@@ -1,8 +1,15 @@
 import SwiftUI
+import UIKit
 
 struct StickerImageView: View {
     let item: StackItem
     var size: CGFloat = 118
+    /// Stack canvases only reveal transparent imagery. A raw source photo stays
+    /// out of the collage until background removal produces a cutout.
+    var requiresCutout = false
+    var shadowOpacity: Double = 0.16
+    var shadowRadius: CGFloat = 10
+    var shadowYOffset: CGFloat = 8
 
     var body: some View {
         ZStack {
@@ -12,7 +19,7 @@ struct StickerImageView: View {
                 .background {
                     stickerHalo
                 }
-                .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 8)
+                .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: 0, y: shadowYOffset)
                 .shadow(color: .white.opacity(0.85), radius: 2, x: 0, y: 0)
 
             if item.removalStatus.isWorking {
@@ -28,16 +35,64 @@ struct StickerImageView: View {
 
     @ViewBuilder
     private var stickerContent: some View {
-        if let imageURL = item.removedBackgroundImageURL ?? item.originalImageURL ?? DemoProductImageCatalog.url(for: item.title) {
+        if let imageURL = item.removedBackgroundImageURL {
+            if imageURL.isFileURL, let image = UIImage(contentsOfFile: imageURL.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .tint(Color.stacksInk)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    case .failure:
+                        fallbackObject
+                    @unknown default:
+                        fallbackObject
+                    }
+                }
+            }
+        } else if let assetName = DemoProductImageCatalog.assetName(for: item.title) {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+        } else if !requiresCutout, let imageURL = item.originalImageURL {
+            if imageURL.isFileURL, let image = UIImage(contentsOfFile: imageURL.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                AsyncImage(url: imageURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .tint(Color.stacksInk)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    case .failure:
+                        fallbackObject
+                    @unknown default:
+                        fallbackObject
+                    }
+                }
+            }
+        } else if !requiresCutout, let imageURL = DemoProductImageCatalog.url(for: item.title) {
             AsyncImage(url: imageURL) { phase in
                 switch phase {
-                case .empty:
-                    ProgressView()
-                        .tint(Color.stacksInk)
                 case .success(let image):
                     image
                         .resizable()
                         .scaledToFit()
+                case .empty:
+                    ProgressView()
+                        .tint(Color.stacksInk)
                 case .failure:
                     fallbackObject
                 @unknown default:
@@ -64,6 +119,53 @@ struct StickerImageView: View {
 }
 
 enum DemoProductImageCatalog {
+    static func assetName(for title: String) -> String? {
+        let lower = title.lowercased()
+
+        // The mock Stack intentionally uses the bundled transparent cutouts so
+        // it reads like a real collection even when the app is offline.
+        let curatedMockAssets: [String: String] = [
+            "graphic t-shirt": "OnboardingTShirt",
+            "gallery tee": "OnboardingWallet",
+            "denim shorts": "OnboardingShorts",
+            "charcoal sweatshirt": "OnboardingWatch",
+            "puffer jacket": "OnboardingWine",
+            "black trench": "OnboardingKeys",
+            "patterned jacket": "OnboardingTote",
+            "slip dress": "OnboardingEarrings",
+            "white robe": "OnboardingSneaker",
+            "black robe": "OnboardingTShirt",
+            "red sneaker": "OnboardingSneaker",
+            "black tote bag": "OnboardingTote"
+        ]
+
+        if let asset = curatedMockAssets[lower] {
+            return asset
+        }
+
+        if lower.contains("shirt") || lower.contains("tee") || lower.contains("sweatshirt") || lower.contains("jacket") || lower.contains("robe") {
+            return "OnboardingTShirt"
+        } else if lower.contains("shorts") {
+            return "OnboardingShorts"
+        } else if lower.contains("earring") {
+            return "OnboardingEarrings"
+        } else if lower.contains("watch") {
+            return "OnboardingWatch"
+        } else if lower.contains("wine") || lower.contains("bottle") {
+            return "OnboardingWine"
+        } else if lower.contains("wallet") {
+            return "OnboardingWallet"
+        } else if lower.contains("key") {
+            return "OnboardingKeys"
+        } else if lower.contains("shoe") || lower.contains("sneaker") {
+            return "OnboardingSneaker"
+        } else if lower.contains("tote") || lower.contains("bag") {
+            return "OnboardingTote"
+        }
+
+        return nil
+    }
+
     static func url(for title: String) -> URL? {
         let lower = title.lowercased()
         let rawURL: String
