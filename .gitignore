@@ -8,4 +8,6 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 .build/
-
+.tools/
+supabase/.temp/
+.tmp-*.png

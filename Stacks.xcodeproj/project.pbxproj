@@ -598,7 +598,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
-				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "";
+				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
+				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwamlwaHZnbWh2dnZmeGt1bndiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MjU5MDQsImV4cCI6MjEwMjIwMTkwNH0.PJxJC3-bI4__yXVJcXCqsEumJdbSe1KXTYg3JqchLbQ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -646,7 +647,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
-				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "";
+				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
+				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwamlwaHZnbWh2dnZmeGt1bndiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MjU5MDQsImV4cCI6MjEwMjIwMTkwNH0.PJxJC3-bI4__yXVJcXCqsEumJdbSe1KXTYg3JqchLbQ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

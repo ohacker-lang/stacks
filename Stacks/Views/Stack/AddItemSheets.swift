@@ -384,7 +384,10 @@ struct ProductLinkImportSheet: View {
                 )
             }
         }
-        .presentationDetents(draft == nil ? [.fraction(0.55)] : [.large])
+        // Link paste is intentionally a focused, nearly full-height moment. The
+        // importer then owns the background-removal transition before showing any
+        // product fields.
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(.thinMaterial)
         .task {
@@ -1128,7 +1131,10 @@ private struct ProductImportDetailScreen: View {
     let onCancel: () -> Void
     let onSave: () -> Void
 
-    @State private var showsLinks = false
+    // Links are part of the product record, not an advanced setting. Keeping
+    // them visible makes the post-processing screen a complete editor whether
+    // the product came from a photo, a pasted URL, or the share extension.
+    @State private var showsLinks = true
     @State private var showsEditableShimmer = false
 
     var body: some View {
@@ -1161,8 +1167,20 @@ private struct ProductImportDetailScreen: View {
 
                         if showsLinks {
                             VStack(spacing: 0) {
-                                ImportDetailRow(label: "Product link", placeholder: "Paste the original link", text: $sourceLink, keyboardType: .URL)
-                                ImportDetailRow(label: "Buy link", placeholder: "Paste a checkout link", text: $buyLink, keyboardType: .URL)
+                                ImportDetailRow(
+                                    label: "Product link",
+                                    placeholder: "Paste the original link",
+                                    text: $sourceLink,
+                                    keyboardType: .URL,
+                                    showsEditableShimmer: showsEditableShimmer
+                                )
+                                ImportDetailRow(
+                                    label: "Buy link",
+                                    placeholder: "Paste a checkout link",
+                                    text: $buyLink,
+                                    keyboardType: .URL,
+                                    showsEditableShimmer: showsEditableShimmer
+                                )
                             }
                             .padding(.horizontal, 24)
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1187,7 +1205,7 @@ private struct ProductImportDetailScreen: View {
                 Spacer()
 
                 Menu {
-                    Button(showsLinks ? "Hide links" : "Edit links", systemImage: "link") {
+                    Button(showsLinks ? "Hide links" : "Show links", systemImage: "link") {
                         withAnimation(.snappy(duration: 0.24)) {
                             showsLinks.toggle()
                         }
@@ -1530,6 +1548,7 @@ private struct ImportDetailRow: View {
     let placeholder: String
     @Binding var text: String
     let keyboardType: UIKeyboardType
+    let showsEditableShimmer: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1542,9 +1561,14 @@ private struct ImportDetailRow: View {
                     .font(.stacksText(size: 15, weight: .regular))
                     .multilineTextAlignment(.trailing)
                     .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .keyboardType(keyboardType)
                 if text.isEmpty {
                     ImportShimmerPlaceholder(text: placeholder, font: .stacksText(size: 15, weight: .regular))
+                        .allowsHitTesting(false)
+                } else if showsEditableShimmer {
+                    ImportShimmerPlaceholder(text: text, font: .stacksText(size: 15, weight: .regular))
+                        .opacity(0.52)
                         .allowsHitTesting(false)
                 }
             }
@@ -1975,9 +1999,7 @@ struct PhotoProductImportSheet: View {
     private var canSave: Bool {
         guard !isSaving,
               !isRemovingBackground,
-              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              validURL(sourceLink) != nil,
-              validURL(buyLink) != nil else { return false }
+              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
 
         if destination == .new {
             return !newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -2070,16 +2092,18 @@ struct PhotoProductImportSheet: View {
     }
 
     private func save() {
-        guard let sourceURL = validURL(sourceLink),
-              let buyURL = validURL(buyLink),
-              canSave else { return }
+        guard canSave else { return }
         isSaving = true
         Task {
             defer { isSaving = false }
             do {
                 let target = try await targetStack()
+                let itemID = UUID()
+                let internalFindURL = URL(string: "https://stacks.app/finds/\(itemID.uuidString)")!
+                let sourceURL = validURL(sourceLink) ?? validURL(buyLink) ?? internalFindURL
+                let buyURL = validURL(buyLink) ?? validURL(sourceLink) ?? internalFindURL
                 let item = StackItem(
-                    id: UUID(), stackID: target.id,
+                    id: itemID, stackID: target.id,
                     title: title.trimmingCharacters(in: .whitespacesAndNewlines),
                     brand: brand.trimmingCharacters(in: .whitespacesAndNewlines),
                     shortDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),

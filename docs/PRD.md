@@ -33,7 +33,7 @@ Stacks makes the saved object the center of the experience: a product is easy to
 3. Let users organize products into highly visual Stacks with a clear title and optional editorial description.
 4. Preserve a reliable source/buy link for every saved product.
 5. Make a Stack attractive enough to share as a personal collection or wishlist.
-6. Establish a simple social loop: discover creators, follow them, and bookmark their Stacks.
+6. Establish a simple social loop: discover creators, follow them, and pin their Stacks.
 
 ### Product principles
 
@@ -101,9 +101,9 @@ A saved product or object. Every item stores:
 
 An optional Stack setting. A wishlist can be shared privately or publicly. Recipients can claim an item through a private claim flow; the Stack owner must not see which items have been claimed.
 
-### Saved / Bookmarked Stack
+### Pinned Stack
 
-A Stack created by another person that a user saves for later. Saved Stacks appear in a clean vertical scrolling view and in the profile's Bookmarked section.
+A Stack that a user keeps close for later. Pins can include the user's own Stacks and eligible Stacks created by others. Pinned Stacks appear in a clean Home pinned bundle and in Profile.
 
 ## 7. V1 User Experience
 
@@ -137,7 +137,7 @@ A Stack created by another person that a user saves for later. Saved Stacks appe
 
 **Content:**
 
-- `Your Stacks` and `Bookmarked` selector.
+- `Your Stacks` and `Pinned` selector.
 - Rows display the Stack title, a four-item product strip, and a chevron.
 - Empty states clearly direct users to create or save a Stack.
 
@@ -256,7 +256,7 @@ Stacks uses lightweight progress and celebration to make collecting feel rewardi
 - Search icon opens a username and Stack-title search field.
 - Browse recent Stacks, saved Stacks, and suggested creators.
 - Follow/unfollow creators.
-- Bookmark/unbookmark Stacks.
+- Pin/unpin Stacks.
 - Saved Stacks use a legible vertical scroll rather than a dense horizontal collage.
 - Demo/seed content must not remain in a processing shimmer state.
 
@@ -267,8 +267,8 @@ Stacks uses lightweight progress and celebration to make collecting feel rewardi
 **Requirements:**
 
 - Accessed from the avatar on Stacks home, rather than a dedicated tab.
-- White editorial profile layout with avatar, name, Stack count, follower count, and bookmark count.
-- Switcher for `Your Stacks` and `Bookmarked`.
+- White editorial profile layout with avatar, name, Stack count, follower count, and pin count.
+- Switcher for `Your Stacks` and `Pinned`.
 - Each Stack row previews its first four product cutouts and opens Stack detail.
 - Settings entry point is visible.
 
@@ -323,7 +323,7 @@ V1 does not require paid subscriptions, in-app checkout, or advertising.
 
 ### Social
 
-- Follow and bookmark conversion rate in Discover.
+- Follow and pin conversion rate in Discover.
 - Return rate after saving another creator’s Stack.
 - Shared Stack views and repeat visits.
 
@@ -345,16 +345,16 @@ V1 is ready for a controlled beta when:
 5. Background removal is functional on supported physical devices and fails gracefully.
 6. Stack detail matches the approved white editorial canvas direction on compact and large iPhones.
 7. Product detail opens and Buy reliably routes to the stored purchase URL.
-8. Discover supports search, follow, bookmark, and opening a Stack.
-9. Profile displays the user’s Stacks and bookmarked Stacks.
+8. Discover supports search, follow, pin, and opening a Stack.
+9. Profile displays the user’s Stacks and pinned Stacks.
 10. No critical crash, broken navigation, duplicate sheet, blocked onboarding, or persistent loading state remains.
 
 ## 12. Risks and Decisions Needed
 
 ### Open decisions
 
-- Is every Stack private by default, or should public sharing be suggested at creation time?
-- Should a user be able to add an item without any link during capture, then be prompted to complete it later? The current V1 recommendation is no: preserve the link requirement, but allow a draft if user research shows capture friction.
+- `private` is the confirmed default Stack visibility. Public sharing may be suggested after a Stack is created, but is never enabled by default.
+- A user can save an Unidentified Find without a link during capture, then complete it later.
 - Should public Stack web previews be part of beta, or follow the native-app beta?
 - Which affiliate provider and merchant coverage should define the first supported Buy integration?
 - Will creator accounts have a different profile capability set from personal accounts in V1?
@@ -377,7 +377,7 @@ V1 is ready for a controlled beta when:
 ### Phase 2: Capture and social beta
 
 - Product search and Share Extension.
-- Discover search, follow, bookmarks, profile.
+- Discover search, follow, pins, profile.
 - Read-only public Stack preview.
 
 ### Phase 3: Commerce and collaboration
@@ -398,6 +398,6 @@ V1 is ready for a controlled beta when:
 - [ ] Each item opens a Product detail screen with a working Buy action.
 - [ ] A Stack detail canvas contains no persistent bottom navigation and no raw rectangular demo images.
 - [ ] Active removal shows shimmer; completed removal does not.
-- [ ] Discover search, following, and bookmarking have working loading and empty states.
-- [ ] Profile accurately separates owned and bookmarked Stacks.
+- [ ] Discover search, following, and pinning have working loading and empty states.
+- [ ] Profile accurately separates owned and pinned Stacks.
 - [ ] The app builds and launches on an iOS 18+ simulator and is verified on a physical device for Vision removal.

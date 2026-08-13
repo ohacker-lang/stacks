@@ -25,7 +25,7 @@ actor MockAuthService: AuthService {
         return session
     }
 
-    func signInWithEmail(_ email: String) async throws -> AuthSession {
+    func signInWithEmail(_ email: String) async throws -> EmailAuthenticationResult {
         guard email.contains("@"), email.contains(".") else {
             throw AppError.invalidEmail
         }
@@ -37,7 +37,21 @@ actor MockAuthService: AuthService {
             hasCompletedOnboarding: false
         )
         self.session = session
-        return session
+        return .authenticated(session)
+    }
+
+    func handleAuthCallback(_ url: URL) async throws -> AuthSession? {
+        // The mock sign-in never opens an external browser, but keeping this
+        // route lets the app exercise the same callback plumbing as Supabase.
+        session
+    }
+
+    func completeOnboarding(for userID: UUID) async throws {
+        guard var session, session.userID == userID else {
+            throw AppError.notFound
+        }
+        session.hasCompletedOnboarding = true
+        self.session = session
     }
 
     func signOut() async throws {
@@ -353,8 +367,16 @@ actor MockStorageService: StorageService {
             throw AppError.missingRequiredField("Image")
         }
 
-        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("OriginalUploads", isDirectory: true)
+        // Application Support survives ordinary cache eviction. This keeps a
+        // saved imported item visually intact in the demo/local path until
+        // Supabase Storage is configured for the signed-in production user.
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appendingPathComponent("Stacks/OriginalUploads", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let fileName = "\(preferredName.linkSlug)-\(UUID().uuidString).jpg"

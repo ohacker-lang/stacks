@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct StacksApp: App {
-    @State private var session = AppSession(services: .mock())
+    @State private var session = AppSession(services: .configured())
 
     init() {
         StacksFontRegistration.registerBundledFonts()
@@ -13,6 +13,9 @@ struct StacksApp: App {
             RootView()
                 .environment(session)
                 .environment(\.appServices, session.services)
+                .onOpenURL { url in
+                    Task { await session.handleIncomingURL(url) }
+                }
         }
     }
 }

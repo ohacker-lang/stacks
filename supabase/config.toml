@@ -1,0 +1,36 @@
+# Development project only. This identifier is safe to commit; credentials stay
+# in the Supabase CLI session and Supabase project secrets.
+project_id = "hpjiphvgmhvvvfxkunwb"
+
+# Every app-facing function requires an authenticated Supabase user. The only
+# public endpoint is the future read-only web preview, which must still enforce
+# Stack visibility internally before it returns any data.
+[functions.link-parser]
+verify_jwt = true
+
+[functions.product-search]
+verify_jwt = true
+
+[functions.background-removal]
+verify_jwt = true
+
+[functions.affiliate-link]
+verify_jwt = true
+
+[functions.ai-description]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.copy-public-stack]
+verify_jwt = true
+
+[functions.create-upload-url]
+verify_jwt = true
+
+[functions.media-url]
+verify_jwt = true
+
+[functions.web-preview]
+verify_jwt = false

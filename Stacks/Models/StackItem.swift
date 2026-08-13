@@ -27,6 +27,21 @@ struct StackItem: Identifiable, Codable, Hashable, Sendable {
         affiliateURL ?? buyURL
     }
 
+    /// Manual photo imports may be saved before the person knows where the
+    /// item came from. Those items use an internal placeholder URL until a
+    /// source or Buy link is added in the editor.
+    var hasExternalPurchaseLink: Bool {
+        guard let scheme = purchaseURL.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return false
+        }
+        return purchaseURL.host?.lowercased() != "stacks.app"
+    }
+
+    var isUnidentifiedFind: Bool {
+        !hasExternalPurchaseLink
+    }
+
     var formattedPrice: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency

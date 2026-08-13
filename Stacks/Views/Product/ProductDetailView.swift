@@ -62,8 +62,15 @@ struct ProductDetailView: View {
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .navigationTransition(.zoom(sourceID: item.id, in: productTransition))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Link(destination: item.purchaseURL) {
-                ProductBuyButton(price: item.formattedPrice)
+            Group {
+                if item.hasExternalPurchaseLink {
+                    Link(destination: item.purchaseURL) {
+                        ProductBuyButton(price: item.formattedPrice)
+                    }
+                } else {
+                    ProductBuyButton(price: "Add a link", isEnabled: false)
+                        .accessibilityLabel("No purchase link available")
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 12)
@@ -215,7 +222,7 @@ private struct ProductDescription: View {
         let description = item.shortDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         if !description.isEmpty { return description }
         if !item.brand.isEmpty { return "Saved from \(item.brand)." }
-        return "A saved find from your Stack."
+        return item.isUnidentifiedFind ? "An unidentified find, saved for later." : "A saved find from your Stack."
     }
 
     var body: some View {
@@ -270,6 +277,7 @@ private struct ProductInfoCell: View {
 
 private struct ProductBuyButton: View {
     let price: String
+    var isEnabled = true
 
     var body: some View {
         HStack(spacing: 10) {
@@ -282,7 +290,7 @@ private struct ProductBuyButton: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 24)
         .frame(height: 62)
-        .background(Color.stacksInk, in: Capsule())
+        .background(isEnabled ? Color.stacksInk : Color.stacksInk.opacity(0.32), in: Capsule())
         .contentShape(Capsule())
     }
 }

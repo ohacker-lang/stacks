@@ -72,6 +72,18 @@ final class StacksModelTests: XCTestCase {
         XCTAssertEqual(stack.ownerID, seed.currentUserID)
     }
 
+    func testMockAuthPersistsCompletedOnboarding() async throws {
+        let seed = MockSeedData()
+        let auth = MockAuthService(seed: seed)
+        let signedIn = try await auth.signInWithApple()
+
+        XCTAssertFalse(signedIn.hasCompletedOnboarding)
+        try await auth.completeOnboarding(for: signedIn.userID)
+
+        let restored = try await auth.restoreSession()
+        XCTAssertTrue(restored?.hasCompletedOnboarding == true)
+    }
+
     @MainActor
     func testCopyStackCreatesAnOwnedItemPreservingDuplicate() async throws {
         let services = AppServices.mock()

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { corsHeaders, jsonResponse, readJson } from "../_shared/http.ts";
+import { corsHeaders, jsonResponse, readJson, requireAuthenticatedUser } from "../_shared/http.ts";
 
 type SerpApiShoppingResult = {
   title?: string;
@@ -27,6 +27,9 @@ serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "method not allowed" }, 405);
   }
+
+  const user = await requireAuthenticatedUser(req);
+  if (user instanceof Response) return user;
 
   const body = await readJson(req);
   const query = String(body.query ?? "").trim();

@@ -3,7 +3,9 @@ import Foundation
 protocol AuthService: Sendable {
     func restoreSession() async throws -> AuthSession?
     func signInWithApple() async throws -> AuthSession
-    func signInWithEmail(_ email: String) async throws -> AuthSession
+    func signInWithEmail(_ email: String) async throws -> EmailAuthenticationResult
+    func handleAuthCallback(_ url: URL) async throws -> AuthSession?
+    func completeOnboarding(for userID: UUID) async throws
     func signOut() async throws
     func requestAccountDeletion() async throws
 }

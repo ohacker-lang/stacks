@@ -7,7 +7,7 @@ struct EmailSignInSheet: View {
     @State private var didFinish = false
     @FocusState private var isEmailFocused: Bool
 
-    let onSubmit: (String) async -> Void
+    let onSubmit: (String) async -> Bool
     let onCancel: () -> Void
 
     private var canSubmit: Bool {
@@ -101,10 +101,12 @@ struct EmailSignInSheet: View {
         guard canSubmit, !isSubmitting else { return }
         isSubmitting = true
         Task {
-            await onSubmit(email.trimmingCharacters(in: .whitespacesAndNewlines))
+            let didSubmit = await onSubmit(email.trimmingCharacters(in: .whitespacesAndNewlines))
             isSubmitting = false
-            didFinish = true
-            dismiss()
+            if didSubmit {
+                didFinish = true
+                dismiss()
+            }
         }
     }
 

@@ -33,10 +33,13 @@ struct AppServices: @unchecked Sendable {
     }
 
     static func supabaseBackedPlaceholder() -> AppServices {
-        AppServices(
-            auth: SupabaseAuthService(),
-            stacks: SupabaseStackRepository(),
-            profiles: SupabaseProfileRepository(),
+        guard let configuration = SupabaseConfiguration.fromAppBundle() else {
+            return mock()
+        }
+        return AppServices(
+            auth: SupabaseAuthService(configuration: configuration),
+            stacks: SupabaseStackRepository(configuration: configuration),
+            profiles: SupabaseProfileRepository(configuration: configuration),
             productSearch: EdgeFunctionProductSearchService(),
             backgroundRemoval: AppleVisionBackgroundRemovalService(),
             affiliate: EdgeFunctionAffiliateService(),
@@ -46,6 +49,13 @@ struct AppServices: @unchecked Sendable {
             realtime: SupabaseRealtimeService(),
             haptics: HapticsService()
         )
+    }
+
+    /// Uses the live backend only after an Xcode configuration provides both
+    /// the Supabase URL and anon key. This keeps local previews usable before
+    /// production credentials are installed.
+    static func configured() -> AppServices {
+        SupabaseConfiguration.fromAppBundle() == nil ? mock() : supabaseBackedPlaceholder()
     }
 }
 

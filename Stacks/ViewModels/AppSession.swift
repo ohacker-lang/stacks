@@ -14,6 +14,7 @@ final class AppSession {
     let services: AppServices
     var state: State = .launching
     var lastError: String?
+    var pendingEmailSignIn = false
 
     init(services: AppServices) {
         self.services = services
@@ -44,23 +45,52 @@ final class AppSession {
         }
     }
 
-    func signInWithApple() async {
+    @discardableResult
+    func signInWithApple() async -> Bool {
         do {
             let session = try await services.auth.signInWithApple()
             state = .onboarding(session)
             lastError = nil
             services.haptics.notification(.success)
+            return true
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
+            return false
         }
     }
 
-    func signInWithEmail(_ email: String) async {
+    @discardableResult
+    func signInWithEmail(_ email: String) async -> Bool {
         do {
-            let session = try await services.auth.signInWithEmail(email)
-            state = .onboarding(session)
+            let result = try await services.auth.signInWithEmail(email)
+            switch result {
+            case .authenticated(let session):
+                state = .onboarding(session)
+                pendingEmailSignIn = false
+            case .linkSent:
+                pendingEmailSignIn = true
+            }
             lastError = nil
+            services.haptics.notification(.success)
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            services.haptics.notification(.error)
+            return false
+        }
+    }
+
+    func handleIncomingURL(_ url: URL) async {
+        do {
+            guard let authSession = try await services.auth.handleAuthCallback(url) else { return }
+            pendingEmailSignIn = false
+            lastError = nil
+            if authSession.hasCompletedOnboarding {
+                state = .signedIn(try await services.profiles.currentProfile(for: authSession))
+            } else {
+                state = .onboarding(authSession)
+            }
             services.haptics.notification(.success)
         } catch {
             lastError = error.localizedDescription
@@ -68,18 +98,23 @@ final class AppSession {
         }
     }
 
-    func completeOnboarding() async {
-        guard case .onboarding(let session) = state else { return }
+    @discardableResult
+    func completeOnboarding() async -> Bool {
+        guard case .onboarding(let session) = state else { return false }
         do {
             var completed = session
             completed.hasCompletedOnboarding = true
+            try await services.auth.completeOnboarding(for: completed.userID)
             let profile = try await services.profiles.currentProfile(for: completed)
             state = .signedIn(profile)
+            pendingEmailSignIn = false
             lastError = nil
             services.haptics.notification(.success)
+            return true
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
+            return false
         }
     }
 
@@ -87,6 +122,7 @@ final class AppSession {
         do {
             try await services.auth.signOut()
             state = .signedOut
+            pendingEmailSignIn = false
         } catch {
             lastError = error.localizedDescription
         }

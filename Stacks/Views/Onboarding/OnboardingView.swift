@@ -66,6 +66,8 @@ struct OnboardingView: View {
     @State private var firstItemImportSheet: FirstItemImportSheet?
     @State private var isShowingFirstItemCamera = false
     @State private var isShowingFirstItemPhotoLibrary = false
+    @State private var isAuthenticating = false
+    @State private var isShowingEmailCheckAlert = false
     @State private var burstMultiplier = 1
     @State private var burstID = 0
     @Namespace private var firstStackCanvasNamespace
@@ -129,10 +131,15 @@ struct OnboardingView: View {
             switch destination {
             case .email:
                 EmailSignInSheet(onSubmit: { email in
-                    await session.signInWithEmail(email)
-                    if case .onboarding = session.state {
-                        advanceToStackIt()
+                    let didSignIn = await session.signInWithEmail(email)
+                    if didSignIn {
+                        if session.pendingEmailSignIn {
+                            isShowingEmailCheckAlert = true
+                        } else {
+                            advanceToStackIt()
+                        }
                     }
+                    return didSignIn
                 }, onCancel: returnToHeroAfterCancelledSignIn)
                 .presentationDetents([.height(194)])
                 .presentationDragIndicator(.visible)
@@ -151,6 +158,11 @@ struct OnboardingView: View {
                 }
             )
             .ignoresSafeArea()
+        }
+        .alert("Check your email", isPresented: $isShowingEmailCheckAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Open the secure Stacks sign-in link we sent you. You’ll return here automatically.")
         }
         .fullScreenCover(item: $firstItemImportSheet) { importSheet in
             if let onboardingProfile {
@@ -216,24 +228,32 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 VStack(spacing: 14) {
-                    PrimaryButton(title: "Continue with Apple", systemImage: "apple.logo") {
+                    PrimaryButton(
+                        title: "Continue with Apple",
+                        systemImage: "apple.logo",
+                        isLoading: isAuthenticating
+                    ) {
+                        guard !isAuthenticating else { return }
                         services.haptics.impact(.medium)
-                        advanceToStackIt()
+                        isAuthenticating = true
                         Task {
-                            await session.signInWithApple()
-                            if case .signedOut = session.state {
-                                returnToHeroAfterCancelledSignIn()
+                            let didSignIn = await session.signInWithApple()
+                            isAuthenticating = false
+                            if didSignIn {
+                                advanceToStackIt()
                             }
                         }
                     }
 
                     Button("Continue with email") {
+                        guard !isAuthenticating else { return }
                         services.haptics.impact(.light)
                         sheet = .email
                     }
                     .buttonStyle(.plain)
                     .font(.stacksText(size: 14, weight: .regular))
                     .foregroundStyle(Color.stacksMutedInk)
+                    .disabled(isAuthenticating)
                 }
                 .padding(.horizontal, isCompact ? 24 : 28)
                 .padding(.bottom, ctaBottomInset)
@@ -383,9 +403,8 @@ struct OnboardingView: View {
     }
 
     private func returnToHeroAfterCancelledSignIn() {
-        guard stage == .stackIt else { return }
-        withAnimation(.easeOut(duration: 0.2)) {
-            stage = .hero
+        if stage != .hero {
+            withAnimation(.easeOut(duration: 0.2)) { stage = .hero }
         }
     }
 }
@@ -515,15 +534,13 @@ private struct FirstStackNameQuestion: View {
                 EmptyStackNameCanvas(
                     title: $title,
                     namespace: namespace,
-                    titleTopInset: proxy.safeAreaInsets.top + 52
+                    titleTopInset: proxy.safeAreaInsets.top + 56
                 )
-                .offset(y: -96)
 
                 OnboardingStackChrome()
                     .padding(.horizontal, 17)
                     .padding(.top, proxy.safeAreaInsets.top + 3)
                     .frame(maxHeight: .infinity, alignment: .top)
-                    .offset(y: -96)
 
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
@@ -539,7 +556,7 @@ private struct FirstStackNameQuestion: View {
                     .padding(.top, 14)
                 }
                 .padding(.horizontal, 24)
-                .padding(.bottom, max(10, proxy.safeAreaInsets.bottom + 4))
+                .padding(.bottom, max(18, proxy.safeAreaInsets.bottom + 8))
             }
         }
     }
@@ -668,21 +685,66 @@ private struct OnboardingStackTitleField: View {
     let isVisible: Bool
 
     var body: some View {
-        TextField("", text: $text)
-            .font(.system(size: fontSize, weight: .bold, design: .default))
-            .tracking(fontSize * OnboardingEditableTitleMetrics.trackingRatio)
-            .foregroundStyle(isVisible ? Color.stacksInk : .clear)
-            .tint(Color.stacksInk)
-            .textFieldStyle(.plain)
-            .textInputAutocapitalization(.words)
-            .textContentType(.name)
-            .autocorrectionDisabled(false)
-            .keyboardType(.default)
-            .multilineTextAlignment(.center)
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .allowsTightening(true)
-            .accessibilityLabel("Name your Stack")
+        ExactCaseStackTitleField(
+            text: $text,
+            fontSize: fontSize,
+            textColor: isVisible ? UIColor(Color.stacksInk) : .clear
+        )
+        .accessibilityLabel("Name your Stack")
+    }
+}
+
+/// UIKit keeps this high-impact title editor stable while its font size changes.
+/// It also deliberately leaves the user's casing untouched.
+private struct ExactCaseStackTitleField: UIViewRepresentable {
+    @Binding var text: String
+    let fontSize: CGFloat
+    let textColor: UIColor
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.delegate = context.coordinator
+        field.borderStyle = .none
+        field.adjustsFontSizeToFitWidth = true
+        field.minimumFontSize = StackTitleTokens.stackTitleMinimumFontSize
+        field.textAlignment = .center
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .yes
+        field.spellCheckingType = .yes
+        field.keyboardType = .default
+        field.returnKeyType = .done
+        field.textContentType = nil
+        field.clearButtonMode = .never
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        if field.text != text { field.text = text }
+        field.font = .systemFont(ofSize: fontSize, weight: .bold)
+        field.textColor = textColor
+        field.tintColor = UIColor(Color.stacksInk)
+        field.defaultTextAttributes = [
+            .kern: fontSize * OnboardingEditableTitleMetrics.trackingRatio
+        ]
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        @Binding private var text: String
+
+        init(text: Binding<String>) { _text = text }
+
+        func textField(
+            _ textField: UITextField,
+            shouldChangeCharactersIn range: NSRange,
+            replacementString string: String
+        ) -> Bool {
+            let current = textField.text ?? ""
+            guard let swiftRange = Range(range, in: current) else { return false }
+            text = current.replacingCharacters(in: swiftRange, with: string)
+            return true
+        }
     }
 }
 

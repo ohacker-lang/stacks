@@ -188,8 +188,15 @@ actor AppleVisionBackgroundRemovalService: BackgroundRemovalService {
     private func writeRemovedImage(_ data: Data, itemID: UUID) throws -> URL {
         guard !data.isEmpty else { throw AppError.missingRequiredField("Image") }
 
-        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("RemovedBackgrounds", isDirectory: true)
+        // Do not leave finished cutouts in Caches. Caches may be purged at any
+        // point, which made previously saved stickers turn back into blanks.
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appendingPathComponent("Stacks/RemovedBackgrounds", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let url = directory.appendingPathComponent("\(itemID.uuidString).png")
