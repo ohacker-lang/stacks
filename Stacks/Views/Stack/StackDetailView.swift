@@ -37,6 +37,8 @@ struct StackDetailView: View {
     @State private var itemToShare: StackItem?
     @State private var itemToMove: StackItem?
     @State private var searchResultForReview: ProductSearchResult?
+    @State private var stackShareImage: UIImage?
+    @State private var isShowingStackShare = false
 
     let stackTransition: Namespace.ID
     let productTransition: Namespace.ID
@@ -60,11 +62,6 @@ struct StackDetailView: View {
         ZStack(alignment: .top) {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    StackViewerTitleBlock(stack: viewModel.stack)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 30)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
                     StackViewerProductCanvas(
                         stack: viewModel.stack,
                         isOwner: session.currentUser?.id == viewModel.stack.ownerID,
@@ -90,16 +87,19 @@ struct StackDetailView: View {
                         }
                     )
                         .padding(.horizontal, 16)
-                        .padding(.top, 6)
+                        .padding(.top, 14)
                         .padding(.bottom, 48)
                 }
                 .frame(maxWidth: .infinity)
             }
 
+        }
+        .background(Color.white.ignoresSafeArea())
+        .safeAreaInset(edge: .top, spacing: 0) {
             StackViewerNavigationOverlay(
+                stack: viewModel.stack,
                 isOwner: session.currentUser?.id == viewModel.stack.ownerID,
                 shareURL: stackShareURL,
-                stackTitle: viewModel.stack.displayTitle,
                 onBack: { dismiss() },
                 onSelectAddSource: { source in
                     services.haptics.impact(.medium)
@@ -118,10 +118,14 @@ struct StackDetailView: View {
                             didCopyStack = true
                         }
                     }
+                },
+                onDownload: {
+                    services.haptics.impact(.medium)
+                    renderStackShareImage()
                 }
             )
+            .background(Color.white)
         }
-        .background(Color.white.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .navigationBar, .tabBar)
         .statusBarHidden(true)
@@ -198,6 +202,11 @@ struct StackDetailView: View {
         .sheet(item: $itemToShare) { item in
             ProductShareSheet(item: item)
         }
+        .sheet(isPresented: $isShowingStackShare) {
+            if let stackShareImage {
+                StackImageShareSheet(image: stackShareImage, stackTitle: viewModel.stack.title)
+            }
+        }
         .sheet(item: $itemToMove) { item in
             if let user = session.currentUser {
                 MoveProductToStackSheet(
@@ -264,99 +273,240 @@ struct StackDetailView: View {
     private var stackShareURL: URL {
         URL(string: "https://stacks.example/stacks/\(viewModel.stack.id.uuidString)")!
     }
+
+    @MainActor
+    private func renderStackShareImage() {
+        let renderer = ImageRenderer(
+            content: StackShareCard(
+                stack: viewModel.stack,
+                localAvatarData: UserDefaults.standard.data(
+                    forKey: "stacks.profile.avatar.\(viewModel.stack.author.id.uuidString)"
+                )
+            )
+                .frame(width: 1_080, height: 1_350)
+        )
+        renderer.scale = 1
+        stackShareImage = renderer.uiImage
+        isShowingStackShare = stackShareImage != nil
+    }
 }
 
 private struct StackViewerNavigationOverlay: View {
+    let stack: Stack
     let isOwner: Bool
     let shareURL: URL
-    let stackTitle: String
     let onBack: () -> Void
     let onSelectAddSource: (AddItemSource) -> Void
     let onCopy: () -> Void
+    let onDownload: () -> Void
+
+    @State private var localAvatarData: Data?
 
     var body: some View {
-        HStack {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 25, weight: .regular))
-                    .foregroundStyle(Color.stacksInk)
-                    .frame(width: 34, height: 34)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back")
-
-            Spacer()
-
-            if isOwner {
-                Menu {
-                    Button {
-                        onSelectAddSource(.search)
-                    } label: {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
-
-                    Button {
-                        onSelectAddSource(.pastedLink)
-                    } label: {
-                        Label("Paste Link", systemImage: "link")
-                    }
-
-                    Button {
-                        onSelectAddSource(.camera)
-                    } label: {
-                        Label("Take Picture", systemImage: "camera")
-                    }
-
-                    Button {
-                        onSelectAddSource(.photoLibrary)
-                    } label: {
-                        Label("Camera Roll", systemImage: "photo.on.rectangle")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .regular))
+        VStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(Color.stacksInk)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 30, height: 42)
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Add product")
-            } else {
-                Menu {
-                    ShareLink(
-                        item: shareURL,
-                        subject: Text(stackTitle),
-                        message: Text("A Stack worth saving.")
-                    ) {
-                        Label("Share Stack", systemImage: "square.and.arrow.up")
-                    }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
 
-                    Button(action: onCopy) {
-                        Label("Copy to Your Stacks", systemImage: "square.on.square")
+                StackHeaderTitle(text: stack.title)
+
+                Spacer(minLength: 6)
+
+                if isOwner {
+                    Menu {
+                        Button { onSelectAddSource(.search) } label: {
+                            Label("Search", systemImage: "magnifyingglass")
+                        }
+                        Button { onSelectAddSource(.pastedLink) } label: {
+                            Label("Paste Link", systemImage: "link")
+                        }
+                        Button { onSelectAddSource(.camera) } label: {
+                            Label("Take Picture", systemImage: "camera")
+                        }
+                        Button { onSelectAddSource(.photoLibrary) } label: {
+                            Label("Camera Roll", systemImage: "photo.on.rectangle")
+                        }
+                    } label: {
+                        HeaderActionIcon(systemName: "plus")
                     }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(Color.stacksInk)
-                        .frame(width: 34, height: 34)
-                        .contentShape(Rectangle())
+                    .accessibilityLabel("Add product")
+                } else {
+                    Menu {
+                        ShareLink(
+                            item: shareURL,
+                            subject: Text(stack.displayTitle),
+                            message: Text("A Stack worth saving.")
+                        ) {
+                            Label("Share Stack", systemImage: "square.and.arrow.up")
+                        }
+                        Button(action: onCopy) {
+                            Label("Copy to Your Stacks", systemImage: "square.on.square")
+                        }
+                    } label: {
+                        HeaderActionIcon(systemName: "square.on.square")
+                    }
+                    .accessibilityLabel("Stack options")
                 }
-                .accessibilityLabel("Stack options")
+
+                Button(action: onDownload) {
+                    HeaderActionIcon(systemName: "arrow.down.to.line")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Export stack image")
             }
+
+            HStack(spacing: 6) {
+                AvatarView(profile: stack.author, size: 17, localImageData: localAvatarData)
+                Text(stack.author.displayName)
+                    .font(.system(size: 14, weight: .medium, design: .default))
+                    .foregroundStyle(Color.stacksInk.opacity(0.78))
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("Last update")
+                    Text(stack.updatedAt.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                }
+                .font(.system(size: 10, weight: .regular, design: .default))
+                .foregroundStyle(Color.stacksMutedInk)
+                .multilineTextAlignment(.trailing)
+            }
+
+            Divider()
+                .overlay(Color.stacksInk.opacity(0.09))
         }
-        .padding(.horizontal, 17)
-        .padding(.top, 4)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+        .task(id: stack.author.id) {
+            localAvatarData = UserDefaults.standard.data(
+                forKey: "stacks.profile.avatar.\(stack.author.id.uuidString)"
+            )
+        }
     }
 }
 
-private struct StackViewerTitleBlock: View {
-    let stack: Stack
+private struct StackHeaderTitle: View {
+    let text: String
 
     var body: some View {
-        StackTitle(text: stack.title)
+        Text(text)
+            .font(.system(size: 49, weight: .bold, design: .default))
+            .tracking(-2.1)
+            .foregroundStyle(Color.stacksInk)
+            .lineLimit(1)
+            .minimumScaleFactor(0.52)
+            .allowsTightening(true)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .zIndex(1)
+            .accessibilityAddTraits(.isHeader)
     }
+}
+
+private struct HeaderActionIcon: View {
+    let systemName: String
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(Color.stacksInk.opacity(0.72))
+            .frame(width: 42, height: 42)
+            .background(Color.stacksInk.opacity(0.055), in: Circle())
+            .contentShape(Circle())
+    }
+}
+
+/// The exported image intentionally uses the same SF Pro header language as
+/// the in-app Stack, while keeping the product arrangement legible in a square
+/// or portrait social post.
+private struct StackShareCard: View {
+    let stack: Stack
+    let localAvatarData: Data?
+
+    private let positions: [CGPoint] = [
+        CGPoint(x: 245, y: 305), CGPoint(x: 690, y: 300), CGPoint(x: 470, y: 575),
+        CGPoint(x: 815, y: 640), CGPoint(x: 215, y: 830), CGPoint(x: 575, y: 910)
+    ]
+
+    var body: some View {
+        ZStack {
+            Color.white
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(stack.title)
+                            .font(.system(size: 78, weight: .bold, design: .default))
+                            .tracking(-3.4)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+
+                        HStack(spacing: 11) {
+                            AvatarView(profile: stack.author, size: 34, localImageData: localAvatarData)
+                            Text(stack.author.displayName)
+                                .font(.system(size: 25, weight: .medium, design: .default))
+                        }
+                        .foregroundStyle(Color.stacksInk.opacity(0.8))
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("STACKS")
+                            .font(.system(size: 17, weight: .bold, design: .default))
+                            .tracking(2)
+                        Text(stack.updatedAt.formatted(.dateTime.month(.abbreviated).day().year()))
+                            .font(.system(size: 18, weight: .regular, design: .default))
+                    }
+                    .foregroundStyle(Color.stacksMutedInk)
+                }
+
+                Rectangle()
+                    .fill(Color.stacksInk.opacity(0.1))
+                    .frame(height: 2)
+                    .padding(.top, 32)
+            }
+            .padding(72)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            ForEach(Array(stack.items.prefix(6).enumerated()), id: \.element.id) { index, item in
+                StickerImageView(
+                    item: item,
+                    size: 290,
+                    requiresCutout: false,
+                    shadowOpacity: 0.08,
+                    shadowRadius: 12,
+                    shadowYOffset: 8
+                )
+                .rotationEffect(.degrees([-8, 7, -3, 9, 5, -6][index]))
+                .position(positions[index])
+            }
+
+            Text("Made with Stacks")
+                .font(.system(size: 18, weight: .semibold, design: .default))
+                .foregroundStyle(Color.stacksMutedInk)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 44)
+        }
+        .foregroundStyle(Color.stacksInk)
+    }
+}
+
+private struct StackImageShareSheet: UIViewControllerRepresentable {
+    let image: UIImage
+    let stackTitle: String
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [image], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private struct StackViewerProductCanvas: View {

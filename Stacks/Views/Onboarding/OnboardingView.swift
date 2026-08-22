@@ -60,12 +60,15 @@ struct OnboardingView: View {
         #endif
     }()
     @State private var firstStackTitle = ""
+    @State private var heroWord = "things"
     @State private var firstStackStep: FirstStackStep = .name
     @State private var firstItemImageData: Data?
     @State private var onboardingProfile: UserProfile?
     @State private var firstItemImportSheet: FirstItemImportSheet?
     @State private var isShowingFirstItemCamera = false
     @State private var isShowingFirstItemPhotoLibrary = false
+    @State private var isLoadingFirstItemImport = false
+    @State private var firstItemImportError: String?
     @State private var isAuthenticating = false
     @State private var isShowingEmailCheckAlert = false
     @State private var burstMultiplier = 1
@@ -147,48 +150,94 @@ struct OnboardingView: View {
                 .presentationBackground(.ultraThinMaterial)
             }
         }
-        .fullScreenCover(isPresented: $isShowingFirstItemPhotoLibrary) {
-            ProductPhotoLibraryPicker(
-                onCapture: { data in
-                    isShowingFirstItemPhotoLibrary = false
-                    openFirstItemImport(.photo, imageData: data)
-                },
-                onCancel: {
-                    isShowingFirstItemPhotoLibrary = false
-                }
-            )
-            .ignoresSafeArea()
-        }
         .alert("Check your email", isPresented: $isShowingEmailCheckAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Open the secure Stacks sign-in link we sent you. You’ll return here automatically.")
         }
-        .fullScreenCover(item: $firstItemImportSheet) { importSheet in
-            if let onboardingProfile {
-                switch importSheet {
-                case .link:
-                    ProductLinkImportSheet(
-                        user: onboardingProfile,
-                        locksDestination: true,
-                        initialNewStackTitle: resolvedFirstStackTitle,
-                        onSaved: finishFirstItemImport
+        .overlay {
+            if isShowingFirstItemPhotoLibrary {
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.10).ignoresSafeArea()
+
+                    ProductPhotoLibraryPicker(
+                        onCapture: { data in
+                            isShowingFirstItemPhotoLibrary = false
+                            openFirstItemImport(.photo, imageData: data)
+                        },
+                        onCancel: {
+                            isShowingFirstItemPhotoLibrary = false
+                        }
                     )
-                case .photo:
-                    PhotoProductImportSheet(
-                        initialImageData: firstItemImageData,
-                        navigationTitle: "Review Product",
-                        user: onboardingProfile,
-                        locksDestination: true,
-                        initialNewStackTitle: resolvedFirstStackTitle,
-                        onSaved: finishFirstItemImport
-                    )
-                }
-            } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 620)
                     .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 28, y: -8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .zIndex(4)
+            } else if let importSheet = firstItemImportSheet, let onboardingProfile {
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.10)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+
+                    Group {
+                        switch importSheet {
+                        case .link:
+                            ProductLinkImportSheet(
+                                user: onboardingProfile,
+                                locksDestination: true,
+                                initialNewStackTitle: resolvedFirstStackTitle,
+                                onSaved: finishFirstItemImport
+                            )
+                        case .photo:
+                            PhotoProductImportSheet(
+                                initialImageData: firstItemImageData,
+                                navigationTitle: "Review Product",
+                                user: onboardingProfile,
+                                locksDestination: true,
+                                initialNewStackTitle: resolvedFirstStackTitle,
+                                onSaved: finishFirstItemImport
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 620)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                    .shadow(color: .black.opacity(0.18), radius: 28, y: -8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .zIndex(3)
+            } else if isLoadingFirstItemImport {
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.08).ignoresSafeArea()
+                    VStack(spacing: 14) {
+                        ProgressView()
+                        Text("Preparing your first Stack…")
+                            .font(.stacksText(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.stacksMutedInk)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .zIndex(3)
             }
+        }
+        .alert("Couldn’t start import", isPresented: Binding(
+            get: { firstItemImportError != nil },
+            set: { if !$0 { firstItemImportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(firstItemImportError ?? "Please try again.")
         }
     }
 
@@ -205,7 +254,7 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     (Text("Collect ").font(.stacksOnboardingSerif(size: titleSize))
                         + Text("your").font(.stacksOnboardingSerif(size: titleSize)).italic()
-                        + Text("\ninternet").font(.stacksOnboardingSerif(size: titleSize)))
+                        + Text("\n\(heroWord)").font(.stacksOnboardingSerif(size: titleSize)))
                         .foregroundStyle(Color.stacksInk)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -260,6 +309,35 @@ struct OnboardingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.white.ignoresSafeArea())
+            .task(id: stage) {
+                guard stage == .hero else { return }
+                await rotateHeroWords()
+            }
+        }
+    }
+
+    private func rotateHeroWords() async {
+        let words = ["things", "wishlists", "clothes", "tech", "internet", "shoes"]
+        var wordIndex = 0
+
+        while !Task.isCancelled {
+            let word = words[wordIndex]
+            for count in 1...word.count {
+                guard !Task.isCancelled else { return }
+                heroWord = String(word.prefix(count))
+                try? await Task.sleep(nanoseconds: 78_000_000)
+            }
+
+            try? await Task.sleep(nanoseconds: 900_000_000)
+
+            if word.count > 1 {
+                for count in stride(from: word.count - 1, through: 0, by: -1) {
+                    guard !Task.isCancelled else { return }
+                    heroWord = String(word.prefix(count))
+                    try? await Task.sleep(nanoseconds: 52_000_000)
+                }
+            }
+            wordIndex = (wordIndex + 1) % words.count
         }
     }
 
@@ -345,13 +423,24 @@ struct OnboardingView: View {
             firstItemImageData = imageData
         }
 
+        isLoadingFirstItemImport = true
+        firstItemImportError = nil
+
         Task {
-            guard case .onboarding(let authSession) = session.state else { return }
+            defer { isLoadingFirstItemImport = false }
+            guard case .onboarding(let authSession) = session.state else {
+                firstItemImportError = "Sign in is still finishing. Please try again in a moment."
+                return
+            }
+
             do {
                 onboardingProfile = try await services.profiles.currentProfile(for: authSession)
-                firstItemImportSheet = importSheet
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
+                    firstItemImportSheet = importSheet
+                }
             } catch {
                 services.haptics.notification(.error)
+                firstItemImportError = "We couldn’t load your profile. Check your connection and try again."
             }
         }
     }
@@ -491,7 +580,7 @@ private struct FirstFindPrompt: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
 
-            Text("Start with a photo. We’ll help with the rest.")
+            Text("Start with a photo or link. We'll do the rest")
                 .font(.stacksText(size: 16, weight: .regular))
                 .foregroundStyle(Color.stacksMutedInk)
                 .multilineTextAlignment(.center)
@@ -555,6 +644,7 @@ private struct FirstStackNameQuestion: View {
                     .foregroundStyle(Color.stacksMutedInk)
                     .padding(.top, 14)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding(.horizontal, 24)
                 .padding(.bottom, max(18, proxy.safeAreaInsets.bottom + 8))
             }
@@ -605,7 +695,7 @@ private struct EmptyStackNameCanvas: View {
     var body: some View {
         GeometryReader { proxy in
             let scale = proxy.size.width / 390
-            let displayTitle = hasTitle ? title : "Name your Stack"
+            let displayTitle = hasTitle ? title : "Tap here to name your stack"
             let titleFontSize = OnboardingEditableTitleMetrics.resolvedFontSize(
                 for: displayTitle,
                 availableWidth: proxy.size.width - 32
@@ -628,10 +718,9 @@ private struct EmptyStackNameCanvas: View {
                 // Keep the placeholder mounted after typing begins. Removing it
                 // changes the ZStack's child identity and causes UIKit to discard
                 // the active text field after the first character.
-                ShimmeringStackTitle(text: "Name your Stack", fontSize: titleFontSize)
+                ShimmeringStackTitle(text: "Tap here to name your stack", fontSize: titleFontSize)
                     .opacity(hasTitle ? 0 : 1)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
+                    .frame(width: max(1, proxy.size.width - 32), height: max(76, titleFontSize * 1.22), alignment: .center)
                     .padding(.top, titleTopInset)
                     .allowsHitTesting(false)
 
@@ -642,11 +731,9 @@ private struct EmptyStackNameCanvas: View {
                 )
                     // Keep the editable masthead constrained to one line rather
                     // than allowing the input control to occupy the full canvas.
-                    .frame(maxWidth: .infinity)
-                    .frame(height: max(76, titleFontSize * 1.22))
-                    .padding(.horizontal, 16)
+                    .frame(width: max(1, proxy.size.width - 32), height: max(76, titleFontSize * 1.22), alignment: .center)
                     .padding(.top, titleTopInset)
-                    .accessibilityLabel("Name your Stack")
+                    .accessibilityLabel("Tap here to name your stack")
             }
             .clipShape(Rectangle())
         }
@@ -690,7 +777,8 @@ private struct OnboardingStackTitleField: View {
             fontSize: fontSize,
             textColor: isVisible ? UIColor(Color.stacksInk) : .clear
         )
-        .accessibilityLabel("Name your Stack")
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityLabel("Tap here to name your stack")
     }
 }
 
@@ -705,8 +793,7 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         let field = UITextField()
         field.delegate = context.coordinator
         field.borderStyle = .none
-        field.adjustsFontSizeToFitWidth = true
-        field.minimumFontSize = StackTitleTokens.stackTitleMinimumFontSize
+        field.adjustsFontSizeToFitWidth = false
         field.textAlignment = .center
         field.autocapitalizationType = .none
         field.autocorrectionType = .yes
@@ -715,6 +802,9 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.returnKeyType = .done
         field.textContentType = nil
         field.clearButtonMode = .never
+        field.textAlignment = .center
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return field
     }
 
@@ -723,7 +813,9 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.font = .systemFont(ofSize: fontSize, weight: .bold)
         field.textColor = textColor
         field.tintColor = UIColor(Color.stacksInk)
+        field.textAlignment = .center
         field.defaultTextAttributes = [
+            .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
             .kern: fontSize * OnboardingEditableTitleMetrics.trackingRatio
         ]
     }
@@ -796,6 +888,8 @@ private struct ShimmeringStackTitle: View {
             .tracking(fontSize * OnboardingEditableTitleMetrics.trackingRatio)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
             .foregroundStyle(
                 LinearGradient(
                     colors: [
@@ -852,7 +946,7 @@ private struct FirstStackOrbCanvas: View {
                 }
 
                 if allowsEditing {
-                    TextField("Name your Stack", text: $title)
+                        TextField("Tap here to name your stack", text: $title)
                         .font(.stacksMasthead(size: 44))
                         .tracking(-1.8)
                         .foregroundStyle(Color.stacksInk)

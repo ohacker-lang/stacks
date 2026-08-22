@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @Environment(AppSession.self) private var session
@@ -40,6 +41,7 @@ struct RootView: View {
                 await session.restore()
             }
         }
+        .dismissKeyboardOnTap()
     }
 
 #if DEBUG
@@ -62,6 +64,27 @@ struct RootView: View {
                 AppShellView()
             }
         }
+    }
+}
+
+private struct DismissKeyboardOnTap: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .onTapGesture {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil,
+                    from: nil,
+                    for: nil
+                )
+            }
+    }
+}
+
+private extension View {
+    func dismissKeyboardOnTap() -> some View {
+        modifier(DismissKeyboardOnTap())
     }
 }
 

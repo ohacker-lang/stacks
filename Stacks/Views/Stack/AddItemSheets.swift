@@ -258,9 +258,6 @@ private struct MinimalLinkPasteStage: View {
             Spacer(minLength: 28)
         }
         .background(.thinMaterial)
-        .task {
-            isFocused = true
-        }
         .onChange(of: isLoading) { _, loading in
             if loading { isFocused = false }
         }

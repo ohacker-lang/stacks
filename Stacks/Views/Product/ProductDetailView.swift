@@ -75,12 +75,7 @@ struct ProductDetailView: View {
             .padding(.horizontal, 22)
             .padding(.top, 12)
             .padding(.bottom, 10)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.7))
-                    .frame(height: 1)
-            }
+            .background(Color.white)
         }
         .sheet(isPresented: $isShowingDestinationPicker) {
             if let user = session.currentUser {

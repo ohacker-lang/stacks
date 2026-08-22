@@ -27,12 +27,16 @@ actor AppleVisionBackgroundRemovalService: BackgroundRemovalService {
 
     private func normalizedImage(from data: Data) throws -> CGImage {
         guard let sourceImage = UIImage(data: data),
-              let sourceCGImage = sourceImage.cgImage else {
+              sourceImage.cgImage != nil else {
             throw AppError.unavailable("This product image could not be decoded for background removal.")
         }
 
         let maximumDimension: CGFloat = 2_048
-        let sourceSize = CGSize(width: sourceCGImage.width, height: sourceCGImage.height)
+        // UIImage.size includes the image's orientation metadata. Using the raw
+        // CGImage dimensions here makes portrait camera captures render into a
+        // landscape canvas (or vice versa), which stretches the cutout after
+        // Vision removes the background.
+        let sourceSize = sourceImage.size
         let scale = min(1, maximumDimension / max(sourceSize.width, sourceSize.height))
         let targetSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
         let format = UIGraphicsImageRendererFormat()

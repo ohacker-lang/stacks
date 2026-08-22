@@ -3,61 +3,61 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A00000000000000000000001 /* StacksApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* StacksApp.swift */; };
-		A00000000000000000000002 /* AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* AuthSession.swift */; };
-		A00000000000000000000003 /* ProductSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* ProductSearchResult.swift */; };
-		A00000000000000000000004 /* SocialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* SocialModels.swift */; };
-		A00000000000000000000005 /* Stack.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Stack.swift */; };
-		A00000000000000000000006 /* StackItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* StackItem.swift */; };
-		A00000000000000000000007 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* UserProfile.swift */; };
-		A00000000000000000000008 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* AppError.swift */; };
-		A00000000000000000000009 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* AppServices.swift */; };
-		A0000000000000000000000A /* MockSeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* MockSeedData.swift */; };
-		A0000000000000000000000B /* MockServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* MockServices.swift */; };
-		A0000000000000000000000C /* ProductionServicePlaceholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* ProductionServicePlaceholders.swift */; };
-		A0000000000000000000000D /* ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* ServiceProtocols.swift */; };
-		A0000000000000000000000E /* AddItemViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* AddItemViewModel.swift */; };
-		A0000000000000000000000F /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* AppSession.swift */; };
-		A00000000000000000000010 /* DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* DiscoverViewModel.swift */; };
-		A00000000000000000000011 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* HomeViewModel.swift */; };
-		A00000000000000000000012 /* StackDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* StackDetailViewModel.swift */; };
-		A00000000000000000000013 /* Color+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* Color+Stacks.swift */; };
-		A00000000000000000000014 /* Date+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* Date+Stacks.swift */; };
-		A00000000000000000000015 /* Font+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000015 /* Font+Stacks.swift */; };
-		A00000000000000000000016 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000016 /* View+Glass.swift */; };
-		A00000000000000000000017 /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* AppShellView.swift */; };
-		A00000000000000000000018 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* RootView.swift */; };
-		A00000000000000000000019 /* BlackPillButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* BlackPillButton.swift */; };
-		A0000000000000000000001A /* GlassCircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001A /* GlassCircleButton.swift */; };
-		A0000000000000000000001B /* LoadingAndEmptyViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* LoadingAndEmptyViews.swift */; };
-		A0000000000000000000001C /* PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* PrimaryButton.swift */; };
-		A0000000000000000000001D /* StickerImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001D /* StickerImageView.swift */; };
-		A0000000000000000000001E /* DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001E /* DiscoverView.swift */; };
-		A0000000000000000000001F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* HomeView.swift */; };
-		A00000000000000000000020 /* EmailSignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* EmailSignInSheet.swift */; };
-		A00000000000000000000021 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000021 /* OnboardingView.swift */; };
-		A00000000000000000000022 /* ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000022 /* ProductDetailView.swift */; };
-		A00000000000000000000023 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* ProfileView.swift */; };
-		A00000000000000000000024 /* AddItemSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000024 /* AddItemSheets.swift */; };
-		A00000000000000000000025 /* StackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000025 /* StackDetailView.swift */; };
+		A00000000000000000000002 /* Models/AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* Models/AuthSession.swift */; };
+		A00000000000000000000003 /* Models/ProductSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Models/ProductSearchResult.swift */; };
+		A00000000000000000000004 /* Models/SocialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* Models/SocialModels.swift */; };
+		A00000000000000000000005 /* Models/Stack.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000005 /* Models/Stack.swift */; };
+		A00000000000000000000006 /* Models/StackItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000006 /* Models/StackItem.swift */; };
+		A00000000000000000000007 /* Models/UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000007 /* Models/UserProfile.swift */; };
+		A00000000000000000000008 /* Services/AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000008 /* Services/AppError.swift */; };
+		A00000000000000000000009 /* Services/AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* Services/AppServices.swift */; };
+		A0000000000000000000000A /* Services/MockSeedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000A /* Services/MockSeedData.swift */; };
+		A0000000000000000000000B /* Services/MockServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000B /* Services/MockServices.swift */; };
+		A0000000000000000000000C /* Services/ProductionServicePlaceholders.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* Services/ProductionServicePlaceholders.swift */; };
+		A0000000000000000000000D /* Services/ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* Services/ServiceProtocols.swift */; };
+		A0000000000000000000000E /* ViewModels/AddItemViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */; };
+		A0000000000000000000000F /* ViewModels/AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* ViewModels/AppSession.swift */; };
+		A00000000000000000000010 /* ViewModels/DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* ViewModels/DiscoverViewModel.swift */; };
+		A00000000000000000000011 /* ViewModels/HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* ViewModels/HomeViewModel.swift */; };
+		A00000000000000000000012 /* ViewModels/StackDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* ViewModels/StackDetailViewModel.swift */; };
+		A00000000000000000000013 /* Extensions/Color+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* Extensions/Color+Stacks.swift */; };
+		A00000000000000000000014 /* Extensions/Date+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* Extensions/Date+Stacks.swift */; };
+		A00000000000000000000015 /* Extensions/Font+Stacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000015 /* Extensions/Font+Stacks.swift */; };
+		A00000000000000000000016 /* Extensions/View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000016 /* Extensions/View+Glass.swift */; };
+		A00000000000000000000017 /* Views/AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000017 /* Views/AppShellView.swift */; };
+		A00000000000000000000018 /* Views/RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000018 /* Views/RootView.swift */; };
+		A00000000000000000000019 /* Views/Components/BlackPillButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000019 /* Views/Components/BlackPillButton.swift */; };
+		A0000000000000000000001A /* Views/Components/GlassCircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001A /* Views/Components/GlassCircleButton.swift */; };
+		A0000000000000000000001B /* Views/Components/LoadingAndEmptyViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* Views/Components/LoadingAndEmptyViews.swift */; };
+		A0000000000000000000001C /* Views/Components/PrimaryButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* Views/Components/PrimaryButton.swift */; };
+		A0000000000000000000001D /* Views/Components/StickerImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001D /* Views/Components/StickerImageView.swift */; };
+		A0000000000000000000001E /* Views/Discover/DiscoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001E /* Views/Discover/DiscoverView.swift */; };
+		A0000000000000000000001F /* Views/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* Views/Home/HomeView.swift */; };
+		A00000000000000000000020 /* Views/Onboarding/EmailSignInSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* Views/Onboarding/EmailSignInSheet.swift */; };
+		A00000000000000000000021 /* Views/Onboarding/OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000021 /* Views/Onboarding/OnboardingView.swift */; };
+		A00000000000000000000022 /* Views/Product/ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000022 /* Views/Product/ProductDetailView.swift */; };
+		A00000000000000000000023 /* Views/Profile/ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Views/Profile/ProfileView.swift */; };
+		A00000000000000000000024 /* Views/Stack/AddItemSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000024 /* Views/Stack/AddItemSheets.swift */; };
+		A00000000000000000000025 /* Views/Stack/StackDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000025 /* Views/Stack/StackDetailView.swift */; };
 		A00000000000000000000026 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000026 /* Assets.xcassets */; };
 		A00000000000000000000027 /* StacksModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000027 /* StacksModelTests.swift */; };
-		A00000000000000000000028 /* AppleVisionBackgroundRemovalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002B /* AppleVisionBackgroundRemovalService.swift */; };
-		A00000000000000000000029 /* PendingSharedLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* PendingSharedLinkStore.swift */; };
-		A0000000000000000000002A /* PendingSharedLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002D /* PendingSharedLinkSheet.swift */; };
-		A0000000000000000000002B /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002E /* AvatarView.swift */; };
+		A00000000000000000000028 /* Services/AppleVisionBackgroundRemovalService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002B /* Services/AppleVisionBackgroundRemovalService.swift */; };
+		A00000000000000000000029 /* Services/PendingSharedLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* Services/PendingSharedLinkStore.swift */; };
+		A0000000000000000000002A /* Views/Stack/PendingSharedLinkSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002D /* Views/Stack/PendingSharedLinkSheet.swift */; };
+		A0000000000000000000002B /* Views/Components/AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002E /* Views/Components/AvatarView.swift */; };
 		A0000000000000000000002C /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002F /* ShareViewController.swift */; };
-		A0000000000000000000002D /* PendingSharedLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* PendingSharedLinkStore.swift */; };
+		A0000000000000000000002D /* Services/PendingSharedLinkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000002C /* Services/PendingSharedLinkStore.swift */; };
 		A0000000000000000000002E /* StacksShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B00000000000000000000032 /* StacksShareExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		A0000000000000000000002F /* ProductPageImageExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* ProductPageImageExtractor.swift */; };
-		A00000000000000000000030 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000034 /* ProfileViewModel.swift */; };
-		A00000000000000000000031 /* InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000035 /* InstrumentSerif-Regular.ttf */; };
-		A00000000000000000000032 /* AddProductFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000036 /* AddProductFlowView.swift */; };
-		A00000000000000000000033 /* WinkyRough-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000037 /* WinkyRough-Black.ttf */; };
+		A0000000000000000000002F /* Services/ProductPageImageExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000033 /* Services/ProductPageImageExtractor.swift */; };
+		A00000000000000000000030 /* ViewModels/ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000034 /* ViewModels/ProfileViewModel.swift */; };
+		A00000000000000000000031 /* Resources/Fonts/InstrumentSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000035 /* Resources/Fonts/InstrumentSerif-Regular.ttf */; };
+		A00000000000000000000032 /* Views/Add/AddProductFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000036 /* Views/Add/AddProductFlowView.swift */; };
+		A00000000000000000000033 /* Resources/Fonts/WinkyRough-Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000037 /* Resources/Fonts/WinkyRough-Black.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -92,67 +92,85 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B00000000000000000000001 /* StacksApp.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "StacksApp.swift"; sourceTree = "<group>"; };
-		B00000000000000000000002 /* AuthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/AuthSession.swift"; sourceTree = "<group>"; };
-		B00000000000000000000003 /* ProductSearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/ProductSearchResult.swift"; sourceTree = "<group>"; };
-		B00000000000000000000004 /* SocialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/SocialModels.swift"; sourceTree = "<group>"; };
-		B00000000000000000000005 /* Stack.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/Stack.swift"; sourceTree = "<group>"; };
-		B00000000000000000000006 /* StackItem.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/StackItem.swift"; sourceTree = "<group>"; };
-		B00000000000000000000007 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Models/UserProfile.swift"; sourceTree = "<group>"; };
-		B00000000000000000000008 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/AppError.swift"; sourceTree = "<group>"; };
-		B00000000000000000000009 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/AppServices.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000A /* MockSeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/MockSeedData.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000B /* MockServices.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/MockServices.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000C /* ProductionServicePlaceholders.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/ProductionServicePlaceholders.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000D /* ServiceProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/ServiceProtocols.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000E /* AddItemViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/AddItemViewModel.swift"; sourceTree = "<group>"; };
-		B0000000000000000000000F /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/AppSession.swift"; sourceTree = "<group>"; };
-		B00000000000000000000010 /* DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/DiscoverViewModel.swift"; sourceTree = "<group>"; };
-		B00000000000000000000011 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/HomeViewModel.swift"; sourceTree = "<group>"; };
-		B00000000000000000000012 /* StackDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/StackDetailViewModel.swift"; sourceTree = "<group>"; };
-		B00000000000000000000013 /* Color+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Extensions/Color+Stacks.swift"; sourceTree = "<group>"; };
-		B00000000000000000000014 /* Date+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Extensions/Date+Stacks.swift"; sourceTree = "<group>"; };
-		B00000000000000000000015 /* Font+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Extensions/Font+Stacks.swift"; sourceTree = "<group>"; };
-		B00000000000000000000016 /* View+Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Extensions/View+Glass.swift"; sourceTree = "<group>"; };
-		B00000000000000000000017 /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/AppShellView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000018 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/RootView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000019 /* BlackPillButton.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/BlackPillButton.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001A /* GlassCircleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/GlassCircleButton.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001B /* LoadingAndEmptyViews.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/LoadingAndEmptyViews.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001C /* PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/PrimaryButton.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001D /* StickerImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/StickerImageView.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001E /* DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Discover/DiscoverView.swift"; sourceTree = "<group>"; };
-		B0000000000000000000001F /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Home/HomeView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000020 /* EmailSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Onboarding/EmailSignInSheet.swift"; sourceTree = "<group>"; };
-		B00000000000000000000021 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Onboarding/OnboardingView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000022 /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Product/ProductDetailView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000023 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Profile/ProfileView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000024 /* AddItemSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Stack/AddItemSheets.swift"; sourceTree = "<group>"; };
-		B00000000000000000000025 /* StackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Stack/StackDetailView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000026 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = "folder.assetcatalog"; path = "Assets.xcassets"; sourceTree = "<group>"; };
-		B00000000000000000000027 /* StacksModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "StacksModelTests.swift"; sourceTree = "<group>"; };
-		B00000000000000000000028 /* Stacks.app */ = {isa = PBXFileReference; explicitFileType = "wrapper.application"; includeInIndex = 0; path = "Stacks.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		B00000000000000000000029 /* StacksTests.xctest */ = {isa = PBXFileReference; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; path = "StacksTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		B0000000000000000000002A /* Stacks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Stacks.entitlements"; sourceTree = "<group>"; };
-		B0000000000000000000002B /* AppleVisionBackgroundRemovalService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/AppleVisionBackgroundRemovalService.swift"; sourceTree = "<group>"; };
-		B0000000000000000000002C /* PendingSharedLinkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/PendingSharedLinkStore.swift"; sourceTree = "<group>"; };
-		B0000000000000000000002D /* PendingSharedLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Stack/PendingSharedLinkSheet.swift"; sourceTree = "<group>"; };
-		B0000000000000000000002E /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Components/AvatarView.swift"; sourceTree = "<group>"; };
-		B0000000000000000000002F /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ShareViewController.swift"; sourceTree = "<group>"; };
-		B00000000000000000000030 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
-		B00000000000000000000031 /* StacksShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "StacksShareExtension.entitlements"; sourceTree = "<group>"; };
-		B00000000000000000000032 /* StacksShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "StacksShareExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
-		B00000000000000000000033 /* ProductPageImageExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Services/ProductPageImageExtractor.swift"; sourceTree = "<group>"; };
-		B00000000000000000000034 /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "ViewModels/ProfileViewModel.swift"; sourceTree = "<group>"; };
-		B00000000000000000000035 /* InstrumentSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/InstrumentSerif-Regular.ttf"; sourceTree = "<group>"; };
-		B00000000000000000000036 /* AddProductFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Views/Add/AddProductFlowView.swift"; sourceTree = "<group>"; };
-		B00000000000000000000037 /* WinkyRough-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/WinkyRough-Black.ttf"; sourceTree = "<group>"; };
+		B00000000000000000000001 /* StacksApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 /* Models/AuthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AuthSession.swift; sourceTree = "<group>"; };
+		B00000000000000000000003 /* Models/ProductSearchResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/ProductSearchResult.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 /* Models/SocialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/SocialModels.swift; sourceTree = "<group>"; };
+		B00000000000000000000005 /* Models/Stack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Stack.swift; sourceTree = "<group>"; };
+		B00000000000000000000006 /* Models/StackItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/StackItem.swift; sourceTree = "<group>"; };
+		B00000000000000000000007 /* Models/UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/UserProfile.swift; sourceTree = "<group>"; };
+		B00000000000000000000008 /* Services/AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AppError.swift; sourceTree = "<group>"; };
+		B00000000000000000000009 /* Services/AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AppServices.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A /* Services/MockSeedData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/MockSeedData.swift; sourceTree = "<group>"; };
+		B0000000000000000000000B /* Services/MockServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/MockServices.swift; sourceTree = "<group>"; };
+		B0000000000000000000000C /* Services/ProductionServicePlaceholders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ProductionServicePlaceholders.swift; sourceTree = "<group>"; };
+		B0000000000000000000000D /* Services/ServiceProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ServiceProtocols.swift; sourceTree = "<group>"; };
+		B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/AddItemViewModel.swift; sourceTree = "<group>"; };
+		B0000000000000000000000F /* ViewModels/AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/AppSession.swift; sourceTree = "<group>"; };
+		B00000000000000000000010 /* ViewModels/DiscoverViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/DiscoverViewModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000011 /* ViewModels/HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/HomeViewModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000012 /* ViewModels/StackDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/StackDetailViewModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000013 /* Extensions/Color+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions/Color+Stacks.swift"; sourceTree = "<group>"; };
+		B00000000000000000000014 /* Extensions/Date+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions/Date+Stacks.swift"; sourceTree = "<group>"; };
+		B00000000000000000000015 /* Extensions/Font+Stacks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions/Font+Stacks.swift"; sourceTree = "<group>"; };
+		B00000000000000000000016 /* Extensions/View+Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions/View+Glass.swift"; sourceTree = "<group>"; };
+		B00000000000000000000017 /* Views/AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/AppShellView.swift; sourceTree = "<group>"; };
+		B00000000000000000000018 /* Views/RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/RootView.swift; sourceTree = "<group>"; };
+		B00000000000000000000019 /* Views/Components/BlackPillButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/BlackPillButton.swift; sourceTree = "<group>"; };
+		B0000000000000000000001A /* Views/Components/GlassCircleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/GlassCircleButton.swift; sourceTree = "<group>"; };
+		B0000000000000000000001B /* Views/Components/LoadingAndEmptyViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/LoadingAndEmptyViews.swift; sourceTree = "<group>"; };
+		B0000000000000000000001C /* Views/Components/PrimaryButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/PrimaryButton.swift; sourceTree = "<group>"; };
+		B0000000000000000000001D /* Views/Components/StickerImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/StickerImageView.swift; sourceTree = "<group>"; };
+		B0000000000000000000001E /* Views/Discover/DiscoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Discover/DiscoverView.swift; sourceTree = "<group>"; };
+		B0000000000000000000001F /* Views/Home/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Home/HomeView.swift; sourceTree = "<group>"; };
+		B00000000000000000000020 /* Views/Onboarding/EmailSignInSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Onboarding/EmailSignInSheet.swift; sourceTree = "<group>"; };
+		B00000000000000000000021 /* Views/Onboarding/OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Onboarding/OnboardingView.swift; sourceTree = "<group>"; };
+		B00000000000000000000022 /* Views/Product/ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Product/ProductDetailView.swift; sourceTree = "<group>"; };
+		B00000000000000000000023 /* Views/Profile/ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Profile/ProfileView.swift; sourceTree = "<group>"; };
+		B00000000000000000000024 /* Views/Stack/AddItemSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Stack/AddItemSheets.swift; sourceTree = "<group>"; };
+		B00000000000000000000025 /* Views/Stack/StackDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Stack/StackDetailView.swift; sourceTree = "<group>"; };
+		B00000000000000000000026 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B00000000000000000000027 /* StacksModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StacksModelTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000028 /* Stacks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Stacks.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000029 /* StacksTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StacksTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0000000000000000000002A /* Stacks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Stacks.entitlements; sourceTree = "<group>"; };
+		B0000000000000000000002B /* Services/AppleVisionBackgroundRemovalService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/AppleVisionBackgroundRemovalService.swift; sourceTree = "<group>"; };
+		B0000000000000000000002C /* Services/PendingSharedLinkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/PendingSharedLinkStore.swift; sourceTree = "<group>"; };
+		B0000000000000000000002D /* Views/Stack/PendingSharedLinkSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Stack/PendingSharedLinkSheet.swift; sourceTree = "<group>"; };
+		B0000000000000000000002E /* Views/Components/AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Components/AvatarView.swift; sourceTree = "<group>"; };
+		B0000000000000000000002F /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		B00000000000000000000030 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B00000000000000000000031 /* StacksShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StacksShareExtension.entitlements; sourceTree = "<group>"; };
+		B00000000000000000000032 /* StacksShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StacksShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000033 /* Services/ProductPageImageExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ProductPageImageExtractor.swift; sourceTree = "<group>"; };
+		B00000000000000000000034 /* ViewModels/ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/ProfileViewModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000035 /* Resources/Fonts/InstrumentSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/InstrumentSerif-Regular.ttf"; sourceTree = "<group>"; };
+		B00000000000000000000036 /* Views/Add/AddProductFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Views/Add/AddProductFlowView.swift; sourceTree = "<group>"; };
+		B00000000000000000000037 /* Resources/Fonts/WinkyRough-Black.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Fonts/WinkyRough-Black.ttf"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		F00000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		F00000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		F00000000000000000000008 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F00000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F00000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F00000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -171,54 +189,54 @@
 			children = (
 				B00000000000000000000001 /* StacksApp.swift */,
 				B0000000000000000000002A /* Stacks.entitlements */,
-				B00000000000000000000002 /* AuthSession.swift */,
-				B00000000000000000000003 /* ProductSearchResult.swift */,
-				B00000000000000000000004 /* SocialModels.swift */,
-				B00000000000000000000005 /* Stack.swift */,
-				B00000000000000000000006 /* StackItem.swift */,
-				B00000000000000000000007 /* UserProfile.swift */,
-				B00000000000000000000008 /* AppError.swift */,
-				B00000000000000000000009 /* AppServices.swift */,
-				B0000000000000000000000A /* MockSeedData.swift */,
-				B0000000000000000000000B /* MockServices.swift */,
-				B0000000000000000000002B /* AppleVisionBackgroundRemovalService.swift */,
-				B0000000000000000000002C /* PendingSharedLinkStore.swift */,
-				B00000000000000000000033 /* ProductPageImageExtractor.swift */,
-				B0000000000000000000000C /* ProductionServicePlaceholders.swift */,
-				B0000000000000000000000D /* ServiceProtocols.swift */,
-				B0000000000000000000000E /* AddItemViewModel.swift */,
-				B0000000000000000000000F /* AppSession.swift */,
-				B00000000000000000000010 /* DiscoverViewModel.swift */,
-				B00000000000000000000011 /* HomeViewModel.swift */,
-				B00000000000000000000034 /* ProfileViewModel.swift */,
-				B00000000000000000000012 /* StackDetailViewModel.swift */,
-				B00000000000000000000013 /* Color+Stacks.swift */,
-				B00000000000000000000014 /* Date+Stacks.swift */,
-				B00000000000000000000015 /* Font+Stacks.swift */,
-				B00000000000000000000016 /* View+Glass.swift */,
-				B00000000000000000000017 /* AppShellView.swift */,
-				B00000000000000000000018 /* RootView.swift */,
-				B00000000000000000000019 /* BlackPillButton.swift */,
-				B0000000000000000000002E /* AvatarView.swift */,
-				B0000000000000000000001A /* GlassCircleButton.swift */,
-				B0000000000000000000001B /* LoadingAndEmptyViews.swift */,
-				B0000000000000000000001C /* PrimaryButton.swift */,
-				B0000000000000000000001D /* StickerImageView.swift */,
-				B0000000000000000000001E /* DiscoverView.swift */,
-				B0000000000000000000001F /* HomeView.swift */,
-				B00000000000000000000020 /* EmailSignInSheet.swift */,
-				B00000000000000000000021 /* OnboardingView.swift */,
-				B00000000000000000000022 /* ProductDetailView.swift */,
-				B00000000000000000000023 /* ProfileView.swift */,
-				B00000000000000000000024 /* AddItemSheets.swift */,
-				B0000000000000000000002D /* PendingSharedLinkSheet.swift */,
-				B00000000000000000000025 /* StackDetailView.swift */,
-				B00000000000000000000036 /* AddProductFlowView.swift */,
+				B00000000000000000000002 /* Models/AuthSession.swift */,
+				B00000000000000000000003 /* Models/ProductSearchResult.swift */,
+				B00000000000000000000004 /* Models/SocialModels.swift */,
+				B00000000000000000000005 /* Models/Stack.swift */,
+				B00000000000000000000006 /* Models/StackItem.swift */,
+				B00000000000000000000007 /* Models/UserProfile.swift */,
+				B00000000000000000000008 /* Services/AppError.swift */,
+				B00000000000000000000009 /* Services/AppServices.swift */,
+				B0000000000000000000000A /* Services/MockSeedData.swift */,
+				B0000000000000000000000B /* Services/MockServices.swift */,
+				B0000000000000000000002B /* Services/AppleVisionBackgroundRemovalService.swift */,
+				B0000000000000000000002C /* Services/PendingSharedLinkStore.swift */,
+				B00000000000000000000033 /* Services/ProductPageImageExtractor.swift */,
+				B0000000000000000000000C /* Services/ProductionServicePlaceholders.swift */,
+				B0000000000000000000000D /* Services/ServiceProtocols.swift */,
+				B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */,
+				B0000000000000000000000F /* ViewModels/AppSession.swift */,
+				B00000000000000000000010 /* ViewModels/DiscoverViewModel.swift */,
+				B00000000000000000000011 /* ViewModels/HomeViewModel.swift */,
+				B00000000000000000000034 /* ViewModels/ProfileViewModel.swift */,
+				B00000000000000000000012 /* ViewModels/StackDetailViewModel.swift */,
+				B00000000000000000000013 /* Extensions/Color+Stacks.swift */,
+				B00000000000000000000014 /* Extensions/Date+Stacks.swift */,
+				B00000000000000000000015 /* Extensions/Font+Stacks.swift */,
+				B00000000000000000000016 /* Extensions/View+Glass.swift */,
+				B00000000000000000000017 /* Views/AppShellView.swift */,
+				B00000000000000000000018 /* Views/RootView.swift */,
+				B00000000000000000000019 /* Views/Components/BlackPillButton.swift */,
+				B0000000000000000000002E /* Views/Components/AvatarView.swift */,
+				B0000000000000000000001A /* Views/Components/GlassCircleButton.swift */,
+				B0000000000000000000001B /* Views/Components/LoadingAndEmptyViews.swift */,
+				B0000000000000000000001C /* Views/Components/PrimaryButton.swift */,
+				B0000000000000000000001D /* Views/Components/StickerImageView.swift */,
+				B0000000000000000000001E /* Views/Discover/DiscoverView.swift */,
+				B0000000000000000000001F /* Views/Home/HomeView.swift */,
+				B00000000000000000000020 /* Views/Onboarding/EmailSignInSheet.swift */,
+				B00000000000000000000021 /* Views/Onboarding/OnboardingView.swift */,
+				B00000000000000000000022 /* Views/Product/ProductDetailView.swift */,
+				B00000000000000000000023 /* Views/Profile/ProfileView.swift */,
+				B00000000000000000000024 /* Views/Stack/AddItemSheets.swift */,
+				B0000000000000000000002D /* Views/Stack/PendingSharedLinkSheet.swift */,
+				B00000000000000000000025 /* Views/Stack/StackDetailView.swift */,
+				B00000000000000000000036 /* Views/Add/AddProductFlowView.swift */,
 				B00000000000000000000026 /* Assets.xcassets */,
-				B00000000000000000000035 /* InstrumentSerif-Regular.ttf */,
-				B00000000000000000000037 /* WinkyRough-Black.ttf */,
+				B00000000000000000000035 /* Resources/Fonts/InstrumentSerif-Regular.ttf */,
+				B00000000000000000000037 /* Resources/Fonts/WinkyRough-Black.ttf */,
 			);
-			path = "Stacks";
+			path = Stacks;
 			sourceTree = "<group>";
 		};
 		D00000000000000000000004 /* StacksTests */ = {
@@ -226,7 +244,7 @@
 			children = (
 				B00000000000000000000027 /* StacksModelTests.swift */,
 			);
-			path = "StacksTests";
+			path = StacksTests;
 			sourceTree = "<group>";
 		};
 		D00000000000000000000005 /* Products */ = {
@@ -246,7 +264,7 @@
 				B00000000000000000000030 /* Info.plist */,
 				B00000000000000000000031 /* StacksShareExtension.entitlements */,
 			);
-			path = "StacksShareExtension";
+			path = StacksShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -261,7 +279,8 @@
 				F00000000000000000000004 /* Resources */,
 				F0000000000000000000000A /* Embed App Extensions */,
 			);
-			buildRules = ();
+			buildRules = (
+			);
 			dependencies = (
 				C00000000000000000000003 /* PBXTargetDependency */,
 			);
@@ -278,7 +297,8 @@
 				F00000000000000000000002 /* Frameworks */,
 				F00000000000000000000006 /* Resources */,
 			);
-			buildRules = ();
+			buildRules = (
+			);
 			dependencies = (
 				C00000000000000000000002 /* PBXTargetDependency */,
 			);
@@ -295,8 +315,10 @@
 				F00000000000000000000008 /* Frameworks */,
 				F00000000000000000000009 /* Resources */,
 			);
-			buildRules = ();
-			dependencies = ();
+			buildRules = (
+			);
+			dependencies = (
+			);
 			name = StacksShareExtension;
 			productName = StacksShareExtension;
 			productReference = B00000000000000000000032 /* StacksShareExtension.appex */;
@@ -350,21 +372,23 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000026 /* Assets.xcassets in Resources */,
-				A00000000000000000000031 /* InstrumentSerif-Regular.ttf in Resources */,
-				A00000000000000000000033 /* WinkyRough-Black.ttf in Resources */,
+				A00000000000000000000031 /* Resources/Fonts/InstrumentSerif-Regular.ttf in Resources */,
+				A00000000000000000000033 /* Resources/Fonts/WinkyRough-Black.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F00000000000000000000006 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		F00000000000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -375,49 +399,49 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000001 /* StacksApp.swift in Sources */,
-				A00000000000000000000002 /* AuthSession.swift in Sources */,
-				A00000000000000000000003 /* ProductSearchResult.swift in Sources */,
-				A00000000000000000000004 /* SocialModels.swift in Sources */,
-				A00000000000000000000005 /* Stack.swift in Sources */,
-				A00000000000000000000006 /* StackItem.swift in Sources */,
-				A00000000000000000000007 /* UserProfile.swift in Sources */,
-				A00000000000000000000008 /* AppError.swift in Sources */,
-				A00000000000000000000009 /* AppServices.swift in Sources */,
-				A0000000000000000000000A /* MockSeedData.swift in Sources */,
-				A0000000000000000000000B /* MockServices.swift in Sources */,
-				A00000000000000000000028 /* AppleVisionBackgroundRemovalService.swift in Sources */,
-				A00000000000000000000029 /* PendingSharedLinkStore.swift in Sources */,
-				A0000000000000000000002F /* ProductPageImageExtractor.swift in Sources */,
-				A0000000000000000000000C /* ProductionServicePlaceholders.swift in Sources */,
-				A0000000000000000000000D /* ServiceProtocols.swift in Sources */,
-				A0000000000000000000000E /* AddItemViewModel.swift in Sources */,
-				A0000000000000000000000F /* AppSession.swift in Sources */,
-				A00000000000000000000010 /* DiscoverViewModel.swift in Sources */,
-				A00000000000000000000011 /* HomeViewModel.swift in Sources */,
-				A00000000000000000000030 /* ProfileViewModel.swift in Sources */,
-				A00000000000000000000012 /* StackDetailViewModel.swift in Sources */,
-				A00000000000000000000013 /* Color+Stacks.swift in Sources */,
-				A00000000000000000000014 /* Date+Stacks.swift in Sources */,
-				A00000000000000000000015 /* Font+Stacks.swift in Sources */,
-				A00000000000000000000016 /* View+Glass.swift in Sources */,
-				A00000000000000000000017 /* AppShellView.swift in Sources */,
-				A00000000000000000000018 /* RootView.swift in Sources */,
-				A00000000000000000000019 /* BlackPillButton.swift in Sources */,
-				A0000000000000000000002B /* AvatarView.swift in Sources */,
-				A0000000000000000000001A /* GlassCircleButton.swift in Sources */,
-				A0000000000000000000001B /* LoadingAndEmptyViews.swift in Sources */,
-				A0000000000000000000001C /* PrimaryButton.swift in Sources */,
-				A0000000000000000000001D /* StickerImageView.swift in Sources */,
-				A0000000000000000000001E /* DiscoverView.swift in Sources */,
-				A0000000000000000000001F /* HomeView.swift in Sources */,
-				A00000000000000000000020 /* EmailSignInSheet.swift in Sources */,
-				A00000000000000000000021 /* OnboardingView.swift in Sources */,
-				A00000000000000000000022 /* ProductDetailView.swift in Sources */,
-				A00000000000000000000023 /* ProfileView.swift in Sources */,
-				A00000000000000000000024 /* AddItemSheets.swift in Sources */,
-				A0000000000000000000002A /* PendingSharedLinkSheet.swift in Sources */,
-				A00000000000000000000025 /* StackDetailView.swift in Sources */,
-				A00000000000000000000032 /* AddProductFlowView.swift in Sources */,
+				A00000000000000000000002 /* Models/AuthSession.swift in Sources */,
+				A00000000000000000000003 /* Models/ProductSearchResult.swift in Sources */,
+				A00000000000000000000004 /* Models/SocialModels.swift in Sources */,
+				A00000000000000000000005 /* Models/Stack.swift in Sources */,
+				A00000000000000000000006 /* Models/StackItem.swift in Sources */,
+				A00000000000000000000007 /* Models/UserProfile.swift in Sources */,
+				A00000000000000000000008 /* Services/AppError.swift in Sources */,
+				A00000000000000000000009 /* Services/AppServices.swift in Sources */,
+				A0000000000000000000000A /* Services/MockSeedData.swift in Sources */,
+				A0000000000000000000000B /* Services/MockServices.swift in Sources */,
+				A00000000000000000000028 /* Services/AppleVisionBackgroundRemovalService.swift in Sources */,
+				A00000000000000000000029 /* Services/PendingSharedLinkStore.swift in Sources */,
+				A0000000000000000000002F /* Services/ProductPageImageExtractor.swift in Sources */,
+				A0000000000000000000000C /* Services/ProductionServicePlaceholders.swift in Sources */,
+				A0000000000000000000000D /* Services/ServiceProtocols.swift in Sources */,
+				A0000000000000000000000E /* ViewModels/AddItemViewModel.swift in Sources */,
+				A0000000000000000000000F /* ViewModels/AppSession.swift in Sources */,
+				A00000000000000000000010 /* ViewModels/DiscoverViewModel.swift in Sources */,
+				A00000000000000000000011 /* ViewModels/HomeViewModel.swift in Sources */,
+				A00000000000000000000030 /* ViewModels/ProfileViewModel.swift in Sources */,
+				A00000000000000000000012 /* ViewModels/StackDetailViewModel.swift in Sources */,
+				A00000000000000000000013 /* Extensions/Color+Stacks.swift in Sources */,
+				A00000000000000000000014 /* Extensions/Date+Stacks.swift in Sources */,
+				A00000000000000000000015 /* Extensions/Font+Stacks.swift in Sources */,
+				A00000000000000000000016 /* Extensions/View+Glass.swift in Sources */,
+				A00000000000000000000017 /* Views/AppShellView.swift in Sources */,
+				A00000000000000000000018 /* Views/RootView.swift in Sources */,
+				A00000000000000000000019 /* Views/Components/BlackPillButton.swift in Sources */,
+				A0000000000000000000002B /* Views/Components/AvatarView.swift in Sources */,
+				A0000000000000000000001A /* Views/Components/GlassCircleButton.swift in Sources */,
+				A0000000000000000000001B /* Views/Components/LoadingAndEmptyViews.swift in Sources */,
+				A0000000000000000000001C /* Views/Components/PrimaryButton.swift in Sources */,
+				A0000000000000000000001D /* Views/Components/StickerImageView.swift in Sources */,
+				A0000000000000000000001E /* Views/Discover/DiscoverView.swift in Sources */,
+				A0000000000000000000001F /* Views/Home/HomeView.swift in Sources */,
+				A00000000000000000000020 /* Views/Onboarding/EmailSignInSheet.swift in Sources */,
+				A00000000000000000000021 /* Views/Onboarding/OnboardingView.swift in Sources */,
+				A00000000000000000000022 /* Views/Product/ProductDetailView.swift in Sources */,
+				A00000000000000000000023 /* Views/Profile/ProfileView.swift in Sources */,
+				A00000000000000000000024 /* Views/Stack/AddItemSheets.swift in Sources */,
+				A0000000000000000000002A /* Views/Stack/PendingSharedLinkSheet.swift in Sources */,
+				A00000000000000000000025 /* Views/Stack/StackDetailView.swift in Sources */,
+				A00000000000000000000032 /* Views/Add/AddProductFlowView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -434,7 +458,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000002C /* ShareViewController.swift in Sources */,
-				A0000000000000000000002D /* PendingSharedLinkStore.swift in Sources */,
+				A0000000000000000000002D /* Services/PendingSharedLinkStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -573,33 +597,23 @@
 		90000000000000000000007 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Stacks/Stacks.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = ZVV8KBVP26;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stacks;
-				INFOPLIST_KEY_UIAppFonts = (
-					"InstrumentSerif-Regular.ttf",
-					"WinkyRough-Black.ttf",
-				);
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.example.stacks";
-						CFBundleURLSchemes = (
-							stacks,
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"com.example.stacks\";\n    CFBundleURLSchemes =     (\n        stacks\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
-				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
 				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwamlwaHZnbWh2dnZmeGt1bndiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MjU5MDQsImV4cCI6MjEwMjIwMTkwNH0.PJxJC3-bI4__yXVJcXCqsEumJdbSe1KXTYg3JqchLbQ";
+				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
+				INFOPLIST_KEY_UIAppFonts = "InstrumentSerif-Regular.ttf WinkyRough-Black.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -611,7 +625,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.owenhackero.stacks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -622,33 +636,23 @@
 		90000000000000000000008 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Stacks/Stacks.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = ZVV8KBVP26;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Stacks;
-				INFOPLIST_KEY_UIAppFonts = (
-					"InstrumentSerif-Regular.ttf",
-					"WinkyRough-Black.ttf",
-				);
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.example.stacks";
-						CFBundleURLSchemes = (
-							stacks,
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"com.example.stacks\";\n    CFBundleURLSchemes =     (\n        stacks\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take pictures of items to add to a Stack.";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
-				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
 				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwamlwaHZnbWh2dnZmeGt1bndiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MjU5MDQsImV4cCI6MjEwMjIwMTkwNH0.PJxJC3-bI4__yXVJcXCqsEumJdbSe1KXTYg3JqchLbQ";
+				INFOPLIST_KEY_STACKS_SUPABASE_URL = "https://hpjiphvgmhvvvfxkunwb.supabase.co";
+				INFOPLIST_KEY_UIAppFonts = "InstrumentSerif-Regular.ttf WinkyRough-Black.ttf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -660,7 +664,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.owenhackero.stacks;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -683,7 +687,7 @@
 					"@loader_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.stacks.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -706,7 +710,7 @@
 					"@loader_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.stacks.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -721,7 +725,7 @@
 				CODE_SIGN_ENTITLEMENTS = StacksShareExtension/StacksShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = ZVV8KBVP26;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StacksShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -731,7 +735,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks.shareextension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.owenhackero.stacks.shareextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -747,7 +751,7 @@
 				CODE_SIGN_ENTITLEMENTS = StacksShareExtension/StacksShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = ZVV8KBVP26;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StacksShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -757,7 +761,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.stacks.shareextension";
+				PRODUCT_BUNDLE_IDENTIFIER = com.owenhackero.stacks.shareextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

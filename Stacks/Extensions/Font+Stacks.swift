@@ -99,8 +99,14 @@ enum StackTitleMetrics {
 
 struct StackTitle: View {
     let text: String
+    let alignment: HorizontalAlignment
 
     @State private var resolvedFontSize = StackTitleTokens.stackTitleMaximumFontSize
+
+    init(text: String, alignment: HorizontalAlignment = .leading) {
+        self.text = text
+        self.alignment = alignment
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -121,7 +127,7 @@ struct StackTitle: View {
                 }
         }
         .frame(height: StackTitleMetrics.lineHeight(for: resolvedFontSize))
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
     }
@@ -131,11 +137,11 @@ struct StackTitle: View {
             .font(.system(size: fontSize, weight: .bold, design: .default))
             .tracking(fontSize * StackTitleTokens.stackTitleTrackingRatio)
             .lineLimit(StackTitleTokens.stackTitleLineLimit)
-            .multilineTextAlignment(.leading)
+            .multilineTextAlignment(alignment == .center ? .center : .leading)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: true, vertical: false)
-            .frame(width: availableWidth, alignment: .leading)
+            .frame(width: availableWidth, alignment: Alignment(horizontal: alignment, vertical: .center))
             .frame(height: StackTitleMetrics.lineHeight(for: fontSize), alignment: .top)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
     }
 }
