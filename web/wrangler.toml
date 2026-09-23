@@ -1,0 +1,16 @@
+name = "stacks-site"
+main = "src/index.js"
+compatibility_date = "2025-09-27"
+
+[[routes]]
+pattern = "stacks.spot"
+custom_domain = true
+
+[[routes]]
+pattern = "www.stacks.spot"
+custom_domain = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
