@@ -2849,7 +2849,7 @@ private struct MagneticStackingField: View {
         let definitions = assets.map { ($0, $0.burstSize, $0.burstRotation) }
 
         let copies = max(1, min(burstMultiplier, 4))
-        particles = (0 ..< copies).flatMap { copy in
+        particles = (0 ..< copies).flatMap { (copy: Int) -> [OnboardingPhysicsParticle] in
             let copyOffset = CGFloat(copy) - CGFloat(copies - 1) / 2
             let copyScale = max(0.66, 1 - CGFloat(copy) * 0.10)
             let cannon = CGPoint(
@@ -2857,12 +2857,11 @@ private struct MagneticStackingField: View {
                 y: size.height * 0.5
             )
 
-            return definitions.enumerated().map { index, definition in
+            return definitions.enumerated().map { (index: Int, definition) -> OnboardingPhysicsParticle in
                 let indexOffset = CGFloat(index - 4)
-                let angle = (CGFloat(index) / CGFloat(max(1, definitions.count))) * .pi * 2
-                    - .pi / 2
-                    + copyOffset * 0.16
-                let speed = 640 + CGFloat(index % 3) * 90 + abs(copyOffset) * 70
+                let fraction: CGFloat = CGFloat(index) / CGFloat(max(1, definitions.count))
+                let angle: CGFloat = fraction * .pi * 2 - .pi / 2 + copyOffset * 0.16
+                let speed: CGFloat = 640 + CGFloat(index % 3) * 90 + abs(copyOffset) * 70
                 return OnboardingPhysicsParticle(
                     asset: definition.0,
                     size: definition.1 * scale * copyScale,
