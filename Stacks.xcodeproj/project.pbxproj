@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		FEC000000000000000000001 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = FEC000000000000000000004 /* RevenueCat */; };
 		FEC000000000000000000002 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = FEC000000000000000000005 /* RevenueCatUI */; };
+		FEC000000000000000000006 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = FEC000000000000000000008 /* PostHog */; };
 		A00000000000000000000001 /* StacksApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000001 /* StacksApp.swift */; };
 		A00000000000000000000002 /* Models/AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* Models/AuthSession.swift */; };
 		A00000000000000000000003 /* Models/ProductSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000003 /* Models/ProductSearchResult.swift */; };
@@ -24,6 +25,7 @@
 		A00000000000000000000035 /* Services/CuratedStackCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000039 /* Services/CuratedStackCatalog.swift */; };
 		A0000000000000000000000D /* Services/ServiceProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* Services/ServiceProtocols.swift */; };
 		FE0000000000000000000001 /* Services/StacksPro.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000002 /* Services/StacksPro.swift */; };
+		FE0000000000000000000A01 /* Services/Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000A02 /* Services/Analytics.swift */; };
 		A0000000000000000000000E /* ViewModels/AddItemViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */; };
 		A0000000000000000000000F /* ViewModels/AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* ViewModels/AppSession.swift */; };
 		A00000000000000000000010 /* ViewModels/DiscoverViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000010 /* ViewModels/DiscoverViewModel.swift */; };
@@ -112,6 +114,7 @@
 		B00000000000000000000039 /* Services/CuratedStackCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/CuratedStackCatalog.swift; sourceTree = "<group>"; };
 		B0000000000000000000000D /* Services/ServiceProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ServiceProtocols.swift; sourceTree = "<group>"; };
 		FE0000000000000000000002 /* Services/StacksPro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/StacksPro.swift; sourceTree = "<group>"; };
+		FE0000000000000000000A02 /* Services/Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Analytics.swift; sourceTree = "<group>"; };
 		FE0000000000000000000003 /* StacksPro.storekit */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = StacksPro.storekit; sourceTree = "<group>"; };
 		B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/AddItemViewModel.swift; sourceTree = "<group>"; };
 		B0000000000000000000000F /* ViewModels/AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModels/AppSession.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 			files = (
 				FEC000000000000000000001 /* RevenueCat in Frameworks */,
 				FEC000000000000000000002 /* RevenueCatUI in Frameworks */,
+				FEC000000000000000000006 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,6 +222,7 @@
 				B00000000000000000000039 /* Services/CuratedStackCatalog.swift */,
 				B0000000000000000000000D /* Services/ServiceProtocols.swift */,
 				FE0000000000000000000002 /* Services/StacksPro.swift */,
+				FE0000000000000000000A02 /* Services/Analytics.swift */,
 				B0000000000000000000000E /* ViewModels/AddItemViewModel.swift */,
 				B0000000000000000000000F /* ViewModels/AppSession.swift */,
 				B00000000000000000000010 /* ViewModels/DiscoverViewModel.swift */,
@@ -304,6 +309,7 @@
 			packageProductDependencies = (
 				FEC000000000000000000004 /* RevenueCat */,
 				FEC000000000000000000005 /* RevenueCatUI */,
+				FEC000000000000000000008 /* PostHog */,
 			);
 			productName = Stacks;
 			productReference = B00000000000000000000028 /* Stacks.app */;
@@ -382,6 +388,7 @@
 			mainGroup = D00000000000000000000002;
 			packageReferences = (
 				FEC000000000000000000003 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+				FEC000000000000000000007 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			productRefGroup = D00000000000000000000005 /* Products */;
 			projectDirPath = "";
@@ -464,6 +471,7 @@
 				A00000000000000000000035 /* Services/CuratedStackCatalog.swift in Sources */,
 				A0000000000000000000000D /* Services/ServiceProtocols.swift in Sources */,
 				FE0000000000000000000001 /* Services/StacksPro.swift in Sources */,
+				FE0000000000000000000A01 /* Services/Analytics.swift in Sources */,
 				A0000000000000000000000E /* ViewModels/AddItemViewModel.swift in Sources */,
 				A0000000000000000000000F /* ViewModels/AppSession.swift in Sources */,
 				A00000000000000000000010 /* ViewModels/DiscoverViewModel.swift in Sources */,
@@ -536,6 +544,14 @@
 				minimumVersion = 5.43.0;
 			};
 		};
+		FEC000000000000000000007 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -548,6 +564,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FEC000000000000000000003 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
 			productName = RevenueCatUI;
+		};
+		FEC000000000000000000008 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FEC000000000000000000007 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
 		};
 /* End XCSwiftPackageProductDependency section */
 
@@ -686,6 +707,8 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan product barcodes to add the correct product listing to a Stack.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Find friends who use Stacks and make sharing and collaborating easier.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save a shareable image of your Stack to Photos.";
+				INFOPLIST_KEY_STACKS_POSTHOG_API_KEY = "";
+				INFOPLIST_KEY_STACKS_POSTHOG_HOST = "https://us.i.posthog.com";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
 				INFOPLIST_KEY_STACKS_REVENUECAT_API_KEY = "test_xBoQfAOmBYlxNwPnWiavFkRGYeF";
 				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "sb_publishable_hD4djOAlXSKPZHDqLh90zg_147MUcM7";
@@ -729,6 +752,8 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan product barcodes to add the correct product listing to a Stack.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Find friends who use Stacks and make sharing and collaborating easier.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save a shareable image of your Stack to Photos.";
+				INFOPLIST_KEY_STACKS_POSTHOG_API_KEY = "";
+				INFOPLIST_KEY_STACKS_POSTHOG_HOST = "https://us.i.posthog.com";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
 				INFOPLIST_KEY_STACKS_REVENUECAT_API_KEY = "";
 				INFOPLIST_KEY_STACKS_SUPABASE_ANON_KEY = "sb_publishable_hD4djOAlXSKPZHDqLh90zg_147MUcM7";

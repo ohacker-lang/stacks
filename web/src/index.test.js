@@ -484,3 +484,62 @@ test("a pin page shows the find and only follows https buy links", async () => {
     assert.equal(missing.status, 404);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+async function runAnalytics(pathname, { boardBody = false } = {}) {
+  const response = await worker.fetch(new Request("https://stacks.spot/analytics.js"), { ...assets, POSTHOG_KEY: "phc_test", POSTHOG_HOST: "https://eu.i.posthog.com" });
+  const script = await response.text();
+  const window = {};
+  const document = {
+    createElement: () => ({}),
+    getElementsByTagName: () => [{ parentNode: { insertBefore() {} } }],
+    body: { classList: { contains: name => boardBody && name === "sp-page" } },
+    addEventListener() {},
+  };
+  new Function("window", "document", "location", `${script.replaceAll("posthog.", "window.posthog.")}`)(window, document, { pathname });
+  return { script, calls: window.posthog.filter(call => Array.isArray(call)) };
+}
+
+test("analytics script is a no-op without a PostHog project key", async () => {
+  const response = await worker.fetch(new Request("https://stacks.spot/analytics.js"), assets);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /javascript/);
+  const script = await response.text();
+  assert.doesNotMatch(script, /posthog/);
+});
+
+test("analytics stays anonymous and labels each page type", async () => {
+  const { script } = await runAnalytics("/");
+  assert.match(script, /persistence:"memory"/);
+  assert.match(script, /disable_session_recording:true/);
+  assert.match(script, /"https:\/\/eu\.i\.posthog\.com"/);
+  const cases = [
+    ["/", { page_type: "home" }],
+    ["/waitlist", { page_type: "waitlist" }],
+    ["/privacy", { page_type: "legal" }],
+    ["/Neeha", { page_type: "profile", profile_username: "neeha" }],
+    ["/neeha/fall-fits/", { page_type: "board", profile_username: "neeha", stack_slug: "fall-fits" }],
+    [`/s/${stackID}/p/${stackID}`, { page_type: "pin" }],
+    [`/s/${stackID}`, { page_type: "wishlist" }],
+  ];
+  for (const [pathname, expected] of cases) {
+    const { calls } = await runAnalytics(pathname);
+    const pageview = calls.find(call => call[0] === "capture" && call[1] === "$pageview");
+    assert.deepEqual(pageview?.[2], expected, pathname);
+  }
+  const board = await runAnalytics(`/s/${stackID}`, { boardBody: true });
+  assert.equal(board.calls.find(call => call[1] === "$pageview")[2].page_type, "board");
+});
+
+test("every Worker page and static page loads the analytics script", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ profile: { displayName: "Neeha", username: "neeha" }, stacks: [] });
+  try {
+    for (const path of ["/neeha", "/aliva", "/nope/page/that/does/not/exist"]) {
+      const html = await (await worker.fetch(new Request(`https://stacks.spot${path}`), assets)).text();
+      assert.match(html, /<script src="\/analytics\.js" defer><\/script>/, path);
+    }
+  } finally { globalThis.fetch = originalFetch; }
+  for (const file of ["index.html", "download.html", "demo-beanies.html", "demo-product.html"]) {
+    assert.match(readFileSync(new URL(`../public/${file}`, import.meta.url), "utf8"), /src="\/analytics\.js"/, file);
+  }
+});

@@ -121,6 +121,7 @@ struct ProfileView: View {
                 guard let url = URL(string: "https://stacks.spot/\(presentedProfile.username.lowercased())") else { return }
                 profileShareURL = url
                 isShowingProfileShare = true
+                Analytics.capture("profile_shared", ["own": true])
             },
             onOpenStack: onOpenStack,
             onToggleFollow: toggleFollow,
@@ -492,6 +493,7 @@ private struct ProfileRedesignScreen: View {
                                     ShareLink(item: profileURL) {
                                         Label("Share profile", systemImage: "square.and.arrow.up")
                                     }
+                                    .simultaneousGesture(TapGesture().onEnded { Analytics.capture("profile_shared", ["own": false]) })
                                 }
                                 if !CuratedStackCatalog.isCuratedProfile(profile.id) {
                                     Button("Report profile", systemImage: "flag") {
@@ -1100,6 +1102,7 @@ private struct AccountInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
     let destination: AccountInfoDestination
     let onRequestDeletion: () -> Void
+    @State private var sharesUsageAnalytics = Analytics.isSharingEnabled
 
     private var publicPageURL: URL? {
         let page: String
@@ -1137,6 +1140,20 @@ private struct AccountInfoSheet: View {
                 }
 
                 if destination == .privacyChoices {
+                    Toggle(isOn: $sharesUsageAnalytics) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Share usage analytics")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Anonymous app usage tied to your account ID, never sold or used for ads.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.stacksMutedInk)
+                        }
+                    }
+                    .tint(Color.stacksInk)
+                    .onChange(of: sharesUsageAnalytics) { _, isOn in
+                        Analytics.isSharingEnabled = isOn
+                    }
+
                     Button {
                         dismiss()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {

@@ -126,6 +126,9 @@ struct AppShellView: View {
                         onFirstStackCreated: openFirstStackTour,
                         stackTransition: stackTransition
                     )
+                    .task(id: homeSection) {
+                        Analytics.screen(homeSection == .discover ? "Discover" : "Home")
+                    }
                     .withAppDestinations(
                         path: $homePath,
                         stackTransition: stackTransition,
@@ -171,6 +174,7 @@ struct AppShellView: View {
                         isPresentingAddProductFlow = false
                     }
                 )
+                .onAppear { Analytics.screen("Add") }
                 .transition(.opacity)
                 .zIndex(1)
             }
@@ -616,6 +620,7 @@ private extension View {
                 } onOpenProfile: { profile in
                     path.wrappedValue.append(.profile(profile))
                 }
+                .onAppear { Analytics.screen("Stack") }
             case .product(let item, let sourceStack):
                 ProductDetailView(
                     item: item,
@@ -626,6 +631,7 @@ private extension View {
                         path.wrappedValue.removeLast()
                     }
                 )
+                .onAppear { Analytics.screen("Product") }
             case .profile(let profile):
                 ProfileView(profile: profile) { stack in
                     path.wrappedValue.append(.stack(stack))
@@ -633,6 +639,7 @@ private extension View {
                     guard !path.wrappedValue.isEmpty else { return }
                     path.wrappedValue.removeLast()
                 }
+                .onAppear { Analytics.screen("Profile") }
             }
         }
     }

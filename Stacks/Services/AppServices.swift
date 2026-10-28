@@ -58,6 +58,30 @@ struct AppServices: @unchecked Sendable {
     /// the Supabase URL and anon key. This keeps local previews usable before
     /// production credentials are installed.
     static func configured() -> AppServices {
+        Analytics.configure()
+        return unmeasured().withAnalytics()
+    }
+
+    /// Wraps the services that create Stacks, save items and import products
+    /// so their events are recorded once (see docs/ANALYTICS.md).
+    func withAnalytics() -> AppServices {
+        AppServices(
+            auth: auth,
+            stacks: AnalyticsStackRepository(base: stacks),
+            profiles: profiles,
+            productSearch: AnalyticsProductSearchService(base: productSearch),
+            backgroundRemoval: AnalyticsBackgroundRemovalService(base: backgroundRemoval),
+            affiliate: affiliate,
+            claims: claims,
+            collaboration: collaboration,
+            storage: storage,
+            realtime: realtime,
+            safety: safety,
+            haptics: haptics
+        )
+    }
+
+    private static func unmeasured() -> AppServices {
         #if STACKS_PERSONAL_TEAM_DEMO
         // Free Personal Teams cannot provision Sign in with Apple or App
         // Groups. The Debug configuration therefore runs a self-contained

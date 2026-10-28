@@ -530,10 +530,24 @@ struct BarcodeProductScannerView: View {
         isLookingUp = true
         scanner.stop()
         Task {
+            let start = ContinuousClock.now
+            Analytics.capture("item_import_started", ["source": "barcode"])
             do {
                 let preview = try await ProductBarcodeLookupService.lookup(code)
+                Analytics.capture("item_import_finished", [
+                    "source": "barcode",
+                    "outcome": preview.imageURL == nil ? "no_image" : "ok",
+                    "has_price": preview.price != nil,
+                    "retailer_host": Analytics.host(of: preview.sourceURL),
+                    "duration_ms": Analytics.milliseconds(since: start),
+                ])
                 await MainActor.run { onProduct(preview) }
             } catch {
+                Analytics.capture("item_import_finished", [
+                    "source": "barcode",
+                    "outcome": "failed",
+                    "duration_ms": Analytics.milliseconds(since: start),
+                ])
                 await MainActor.run {
                     isLookingUp = false
                     errorMessage = error.localizedDescription

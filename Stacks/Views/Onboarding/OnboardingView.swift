@@ -217,6 +217,9 @@ struct OnboardingView: View {
                 .presentationBackground(.ultraThinMaterial)
             }
         }
+        .task(id: onboardingStepName) {
+            Analytics.capture("onboarding_step_viewed", ["step": onboardingStepName])
+        }
         .fullScreenCover(isPresented: $isShowingProPaywall, onDismiss: finishOnboarding) {
             StacksProPaywall()
         }
@@ -504,6 +507,10 @@ struct OnboardingView: View {
                 .background(Color.white.ignoresSafeArea())
             }
         }
+    }
+
+    private var onboardingStepName: String {
+        stage == .firstStack ? "firstStack.\(firstStackStep)" : "\(stage)"
     }
 
     private var resolvedFirstStackTitle: String {
