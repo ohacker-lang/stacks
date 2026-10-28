@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import sharp from "sharp";
 import worker from "./index.js";
 
 const stackID = "486c448c-dcb6-4f2f-91d1-1d71419eb7a6";
@@ -58,6 +60,130 @@ test("invalid and unavailable links never render private content", async () => {
   }
 });
 
+test("ordinary stacks.spot/username pages show only public profile data supplied by the backend", async () => {
+  const originalFetch = globalThis.fetch;
+  let requested;
+  globalThis.fetch = async (url) => {
+    requested = url.toString();
+    return Response.json({
+      profile: { displayName: "Alex", username: "alex", bio: "Beanies", avatarURL: null },
+      stacks: [{ id: stackID, title: "Beanies", images: [] }],
+    });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://stacks.spot/Alex"), assets);
+    assert.equal(response.status, 200);
+    assert.match(requested, /profile=alex/);
+    assert.match(await response.text(), new RegExp(`/s/${stackID}`));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Aliva is a code-backed curator, not a backend account", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error("Aliva must not query Supabase"); };
+  try {
+    const catalog = await worker.fetch(new Request("https://stacks.spot/api/curated"), assets);
+    assert.equal(catalog.status, 200);
+    const data = await catalog.json();
+    assert.equal(data.profile.username, "aliva");
+    assert.equal(data.stacks[0].title, "Fall Reset");
+    assert.equal(data.stacks[0].items.length, 19);
+    assert.ok(data.stacks[0].items.every(item => item.sourceURL.startsWith("https://")));
+
+    const profile = await worker.fetch(new Request("https://stacks.spot/aliva"), assets);
+    assert.match(await profile.text(), /Curated by Stacks/);
+    const stack = await worker.fetch(new Request(`https://stacks.spot/s/${data.stacks[0].id}`), assets);
+    assert.equal(stack.status, 200);
+    const stackHTML = await stack.text();
+    assert.match(stackHTML, /Fall Reset/);
+    assert.match(stackHTML, /height:2200px/);
+    assert.match(stackHTML, /left:50%;top:2070px/);
+    const item = data.stacks[0].items[5];
+    const product = await worker.fetch(new Request(`https://stacks.spot/s/${data.stacks[0].id}/p/${item.id}`), assets);
+    assert.equal(product.status, 200);
+    assert.match(await product.text(), /saiehello\.com\/products\/the-vanity-case-1/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("curated products stay inside non-overlapping two-column placement boxes", async () => {
+  const catalog = await worker.fetch(new Request("https://stacks.spot/api/curated"), assets);
+  for (const stack of (await catalog.json()).stacks) {
+    const response = await worker.fetch(new Request(`https://stacks.spot/s/${stack.id}`), assets);
+    const html = await response.text();
+    const positions = [...html.matchAll(/class="demo-item curated-item" style="left:(\d+)%;top:(\d+)px"/g)]
+      .map(([, x, y]) => ({ x: Number(x), y: Number(y) }));
+    assert.equal(positions.length, stack.items.length);
+    for (let index = 0; index < positions.length; index += 1) {
+      const position = positions[index];
+      const inPage = index % 4;
+      const pageCount = Math.min(4, stack.items.length - Math.floor(index / 4) * 4);
+      const centered = pageCount === 1 || (pageCount === 3 && inPage === 2);
+      assert.equal(position.x, centered ? 50 : inPage % 2 === 0 ? 25 : 75);
+      if (index >= 2) assert.ok(position.y - positions[index - 2].y >= 205);
+    }
+  }
+
+  // The prior regression was an image 3x taller than its correctly sized tile.
+  const css = readFileSync(new URL("../public/site.css", import.meta.url), "utf8");
+  const imageRule = css.match(/\.curated-stack-page \.demo-item img\{([^}]+)\}/)?.[1];
+  assert.ok(imageRule, "Curated images need an explicit containment rule");
+  const declarations = Object.fromEntries(imageRule.split(";").filter(Boolean).map(declaration => {
+    const [property, ...value] = declaration.split(":");
+    return [property.trim(), value.join(":").trim()];
+  }));
+  assert.equal(declarations.position, "absolute");
+  assert.equal(declarations.width, "100%");
+  assert.equal(declarations.height, "100%");
+  assert.equal(declarations["object-fit"], "contain");
+
+  assert.match(css, /\.public-grid\{grid-template-columns:repeat\(auto-fit,minmax\(min\(100%,270px\),390px\)\);justify-content:center\}/);
+  assert.match(css, /\.public-stack-card\{position:relative;width:100%;max-width:390px;justify-self:center/);
+});
+
+test("every published curated product has a transparent cutout", async () => {
+  const catalog = await worker.fetch(new Request("https://stacks.spot/api/curated"), assets);
+  for (const stack of (await catalog.json()).stacks) for (const item of stack.items) {
+    const imageURL = new URL(item.imageURL);
+    assert.equal(imageURL.origin, "https://stacks.spot");
+    assert.match(imageURL.pathname, /^\/assets\/[a-z0-9/_-]+\.(png|webp)$/);
+    const file = new URL(`../public${imageURL.pathname}`, import.meta.url);
+    const image = sharp(readFileSync(file));
+    const { data, info } = await image.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alphaAt = (x, y) => data[(y * info.width + x) * info.channels + 3];
+    const corners = [[0, 0], [info.width - 1, 0], [0, info.height - 1], [info.width - 1, info.height - 1]];
+    assert.ok(corners.every(([x, y]) => alphaAt(x, y) < 24), `${item.title} retained its photo background`);
+    assert.ok(data.some((value, index) => index % info.channels === 3 && value > 240), `${item.title} is empty`);
+  }
+});
+
+test("product detail cutouts are bounded by their stage before the title", async () => {
+  const catalog = await worker.fetch(new Request("https://stacks.spot/api/curated"), assets);
+  const stack = (await catalog.json()).stacks[0];
+  const item = stack.items[1]; // Tall HydroJug image exposed the overflow.
+  const response = await worker.fetch(new Request(`https://stacks.spot/s/${stack.id}/p/${item.id}`), assets);
+  const html = await response.text();
+  assert.ok(html.indexOf('class="product-stage"') < html.indexOf(`<h1>${item.title}</h1>`));
+
+  const css = readFileSync(new URL("../public/site.css", import.meta.url), "utf8");
+  const stage = css.match(/\.product-stage\{([^}]+)\}/)?.[1] ?? "";
+  const image = css.match(/\.product-stage img\{([^}]+)\}/)?.[1] ?? "";
+  assert.match(stage, /position:relative/);
+  assert.match(stage, /height:min\(320px,38svh\)/);
+  assert.match(image, /position:absolute/);
+  assert.match(image, /height:100%/);
+  assert.match(image, /max-height:100%/);
+  assert.match(image, /object-fit:contain/);
+});
+
+test("a non-public username fails closed", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ error: "Profile unavailable" }, { status: 404 });
+  try {
+    const response = await worker.fetch(new Request("https://stacks.spot/privateuser"), assets);
+    assert.equal(response.status, 404);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("unexpected upstream redirects are never followed", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(null, { status: 302, headers: { Location: "https://example.com/" } });
@@ -105,28 +231,105 @@ test("each demo beanie has a direct product-detail route and unknown products fa
   assert.equal(removed.status, 404);
 });
 
-test("download page is a static asset without inventing an App Store URL", async () => {
+test("waitlist page is a static asset and old download links redirect", async () => {
   let requestedPath;
   const downloadAssets = { ASSETS: { fetch: async (request) => {
     requestedPath = new URL(request.url).pathname;
     return new Response("download");
   } } };
-  const response = await worker.fetch(new Request("https://stacks.spot/download"), downloadAssets);
+  const response = await worker.fetch(new Request("https://stacks.spot/waitlist"), downloadAssets);
   assert.equal(response.status, 200);
   assert.equal(requestedPath, "/download");
+  const oldLink = await worker.fetch(new Request("https://stacks.spot/download"), downloadAssets);
+  assert.equal(oldLink.status, 308);
+  assert.equal(oldLink.headers.get("location"), "https://stacks.spot/waitlist");
 });
 
-test("app-backed Stack page links to download while the App Store listing is pending", async () => {
+test("app-backed Stack page links to waitlist while the App Store listing is pending", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response('<html><head></head><body><div class="topline"><span>For iPhone · coming soon</span></div><section class="pitch"><h2>Make a Stack</h2><p>Try it.</p></section></body></html>');
   try {
     const response = await worker.fetch(new Request(`https://stacks.spot/s/${stackID}`), assets);
     const html = await response.text();
     assert.equal(response.status, 200);
-    assert.equal((html.match(/href="\/download"/g) ?? []).length, 2);
+    assert.equal((html.match(/href="\/waitlist"/g) ?? []).length, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("waitlist availability checks use Supabase without exposing emails", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstream;
+  globalThis.fetch = async (url, options) => {
+    upstream = { url, options };
+    return Response.json(true);
+  };
+  try {
+    const env = { ...assets, SUPABASE_URL: "https://example.supabase.co", SUPABASE_PUBLISHABLE_KEY: "public-key" };
+    const response = await worker.fetch(new Request("https://stacks.spot/api/waitlist/availability?username=aliva"), env);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { available: true });
+    assert.match(upstream.url, /rpc\/waitlist_username_available$/);
+    assert.equal(JSON.parse(upstream.options.body).p_username, "aliva");
+    const invalid = await worker.fetch(new Request("https://stacks.spot/api/waitlist/availability?username=ab"), env);
+    assert.deepEqual(await invalid.json(), { available: false });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("waitlist signup validates input, writes one private RPC, and handles taken names", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    calls += 1;
+    assert.match(url, /rpc\/reserve_waitlist_username$/);
+    assert.deepEqual(JSON.parse(options.body), { p_username: "aliva", p_email: "aliva@example.com" });
+    return Response.json(calls === 1 ? "joined" : "username_taken");
+  };
+  try {
+    const env = { ...assets, SUPABASE_URL: "https://example.supabase.co", SUPABASE_PUBLISHABLE_KEY: "public-key" };
+    const headers = { Origin: "https://stacks.spot", "Content-Type": "application/json" };
+    const input = { username: "Aliva", email: "Aliva@Example.com" };
+    const joined = await worker.fetch(new Request("https://stacks.spot/api/waitlist", { method: "POST", headers, body: JSON.stringify(input) }), env);
+    assert.equal(joined.status, 201);
+    assert.deepEqual(await joined.json(), { status: "joined" });
+    const taken = await worker.fetch(new Request("https://stacks.spot/api/waitlist", { method: "POST", headers, body: JSON.stringify(input) }), env);
+    assert.equal(taken.status, 409);
+    assert.deepEqual(await taken.json(), { status: "username_taken" });
+    const invalid = await worker.fetch(new Request("https://stacks.spot/api/waitlist", { method: "POST", headers, body: JSON.stringify({ username: "a", email: "bad" }) }), env);
+    assert.equal(invalid.status, 400);
+    assert.equal(calls, 2);
+    const crossSite = await worker.fetch(new Request("https://stacks.spot/api/waitlist", { method: "POST", headers: { Origin: "https://elsewhere.test", "Content-Type": "application/json" }, body: JSON.stringify(input) }), env);
+    assert.equal(crossSite.status, 403);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("public legal pages show the support domain address", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response('<html><head></head><body><a href="mailto:trystacks@gmail.com">trystacks@gmail.com</a></body></html>');
+  try {
+    const response = await worker.fetch(new Request("https://stacks.spot/support"), assets);
+    const html = await response.text();
+    assert.match(html, /mailto:support@stacks\.spot/);
+    assert.doesNotMatch(html, /trystacks@gmail\.com/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("demo products show saved prices without inventing unavailable prices", () => {
+  const productHTML = readFileSync(new URL("../public/demo-product.html", import.meta.url), "utf8");
+  const siteJS = readFileSync(new URL("../public/site.js", import.meta.url), "utf8");
+  assert.match(productHTML, /id="demo-product-price"/);
+  for (const expected of ["$25.00", "€17.99", "$88.00", "$60.00", "€24.95", "From $85", "$30.00"]) {
+    assert.ok(siteJS.includes(expected), `${expected} shown in catalog`);
+  }
+  assert.match(siteJS, /"black-columbia"[^\n]+"Out of stock"/);
+  assert.match(siteJS, /"green-stripe"[^\n]+"Check Amazon"/);
 });
 
 test("public feed renders only sanitized IDs and escaped app content", async () => {
@@ -147,6 +350,13 @@ test("public feed renders only sanitized IDs and escaped app content", async () 
     assert.match(html, new RegExp(`href="/s/${stackID}"`));
     assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
     assert.match(html, /A &amp; B/);
+    assert.match(html, /class="discover-feed"/);
+    assert.match(html, /class="discover-stack-card"/);
+    assert.match(html, /class="discover-card-heading"/);
+    assert.match(html, /class="discover-card-footer"/);
+    const card = html.match(/<article class="discover-stack-card">([\s\S]*?)<\/article>/)?.[1] ?? "";
+    assert.ok(card.indexOf("discover-card-heading") < card.indexOf("public-stack-art"));
+    assert.match(card, /public-stack-cutout-1/);
     assert.doesNotMatch(html, /Should not appear/);
     assert.match(html, /stacks\?page=2/);
   } finally {
@@ -154,13 +364,15 @@ test("public feed renders only sanitized IDs and escaped app content", async () 
   }
 });
 
-test("public feed fails closed when its backend is unavailable", async () => {
+test("public feed falls back to code-backed curation when its backend is unavailable", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response('unavailable', { status: 503 });
   try {
     const response = await worker.fetch(new Request('https://stacks.spot/stacks'), assets);
-    assert.equal(response.status, 503);
-    assert.equal(response.headers.get('x-robots-tag'), 'noindex');
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /Fall Reset/);
+    assert.doesNotMatch(html, /Private Stack/);
   } finally {
     globalThis.fetch = originalFetch;
   }

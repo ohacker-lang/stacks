@@ -73,4 +73,23 @@ $$;
 rollback to savepoint editor_cannot_publish;
 
 reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+update public.stacks
+set collaboration_enabled = false
+where id = '30000000-0000-4000-8000-000000000001';
+
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select pg_temp.assert_false(
+  exists (select 1 from public.stacks where id = '30000000-0000-4000-8000-000000000001'),
+  'disabling collaboration suspends private Stack access'
+);
+select pg_temp.assert_false(
+  public.can_edit_stack('30000000-0000-4000-8000-000000000001'),
+  'disabling collaboration suspends editor access'
+);
+
+reset role;
 rollback;

@@ -12,6 +12,7 @@ final class ProfileViewModel {
 
     var stackCount: Int { stacks.count }
     var bookmarkCount: Int { bookmarkedStacks.count }
+    var productCount: Int { stacks.reduce(0) { $0 + $1.items.count } }
 
     func load(services: AppServices, profile: UserProfile, currentUser: UserProfile?) async {
         isLoading = true

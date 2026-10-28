@@ -41,7 +41,7 @@ private struct StoredSupabaseSession: Codable, Sendable {
 /// database. The actor serializes refresh and clear operations across services.
 private actor SupabaseSessionStore {
     static let shared = SupabaseSessionStore()
-    private let service = "com.example.stacks.supabase"
+    private let service = "com.owenhackero.stacks.supabase"
     private let account = "current-session"
 
     func load() -> StoredSupabaseSession? {
@@ -250,6 +250,54 @@ private struct SupabaseClient: Sendable {
         )
     }
 
+    func recordLegalAcceptance(id: UUID, version: String) async throws {
+        struct AcceptancePayload: Encodable {
+            let userID: UUID
+            let legalTermsVersion: String
+            let privacyPolicyVersion: String
+            let acceptanceSource: String
+            let appVersion: String?
+            let appBuild: String?
+
+            enum CodingKeys: String, CodingKey {
+                case userID = "user_id"
+                case legalTermsVersion = "legal_terms_version"
+                case privacyPolicyVersion = "privacy_policy_version"
+                case acceptanceSource = "acceptance_source"
+                case appVersion = "app_version"
+                case appBuild = "app_build"
+            }
+        }
+
+        let acceptance = AcceptancePayload(
+            userID: id,
+            legalTermsVersion: version,
+            privacyPolicyVersion: version,
+            acceptanceSource: "ios_clickwrap",
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            appBuild: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        )
+        _ = try await restData(
+            "legal_acceptances",
+            method: "POST",
+            body: try encoder.encode(acceptance)
+        )
+
+        let acceptedAt = iso8601.string(from: Date())
+        let body = try encoder.encode([
+            "legal_terms_version": version,
+            "legal_terms_accepted_at": acceptedAt,
+            "privacy_policy_version": version,
+            "privacy_policy_accepted_at": acceptedAt
+        ])
+        _ = try await restData(
+            "profiles",
+            query: [URLQueryItem(name: "id", value: "eq.\(id.uuidString)")],
+            method: "PATCH",
+            body: body
+        )
+    }
+
     func sendMagicLink(email: String) async throws {
         let verifier = PKCE.verifier()
         let challenge = PKCE.challenge(for: verifier)
@@ -296,6 +344,28 @@ private struct SupabaseClient: Sendable {
         return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
     }
 
+    func googleOAuthAuthorizationURL() async throws -> (url: URL, callbackScheme: String) {
+        let verifier = PKCE.verifier()
+        let challenge = PKCE.challenge(for: verifier)
+        await sessionStore.savePendingPKCEVerifier(verifier)
+
+        var components = URLComponents(
+            url: configuration.projectURL.appending(path: "auth/v1/authorize"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "provider", value: "google"),
+            URLQueryItem(name: "redirect_to", value: configuration.redirectURL.absoluteString),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "s256")
+        ]
+        guard let url = components?.url,
+              let callbackScheme = configuration.redirectURL.scheme else {
+            throw AppError.invalidURL
+        }
+        return (url, callbackScheme)
+    }
+
     func signOut() async throws {
         guard let session = await sessionStore.load() else { return }
         _ = try? await request(
@@ -307,9 +377,23 @@ private struct SupabaseClient: Sendable {
     }
 
     func uploadMedia(_ data: Data, path: String, contentType: String) async throws {
+        try await uploadData(data, bucket: "stack-media", path: path, contentType: contentType)
+    }
+
+    func uploadProfileAvatar(_ data: Data, ownerID: UUID) async throws -> String {
+        guard let image = UIImage(data: data),
+              let jpegData = image.jpegData(compressionQuality: 0.86) else {
+            throw AppError.unavailable("We couldn't prepare that profile photo. Try another image.")
+        }
+        let path = "\(ownerID.uuidString)/avatar.jpg"
+        try await uploadData(jpegData, bucket: "profile-media", path: path, contentType: "image/jpeg")
+        return path
+    }
+
+    private func uploadData(_ data: Data, bucket: String, path: String, contentType: String) async throws {
         guard !data.isEmpty else { throw AppError.missingRequiredField("Image") }
         let encodedPath = path.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
-        var request = URLRequest(url: configuration.projectURL.appending(path: "storage/v1/object/stack-media/\(encodedPath)"))
+        var request = URLRequest(url: configuration.projectURL.appending(path: "storage/v1/object/\(bucket)/\(encodedPath)"))
         request.httpMethod = "POST"
         request.httpBody = data
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
@@ -319,16 +403,20 @@ private struct SupabaseClient: Sendable {
         _ = try await perform(request, authenticated: false)
     }
 
-    func signedMediaURL(path: String, stackID: UUID) async -> URL? {
-        struct MediaRequest: Encodable { let stackID: UUID; let path: String }
+    func signedMediaURL(path: String, stackID: UUID, linkToken: UUID? = nil) async -> URL? {
+        struct MediaRequest: Encodable { let stackID: UUID; let path: String; let linkToken: UUID? }
         struct MediaResponse: Decodable { let signedURL: URL }
         guard let response: MediaResponse = try? await function(
             "media-url",
-            body: MediaRequest(stackID: stackID, path: path)
+            body: MediaRequest(stackID: stackID, path: path, linkToken: linkToken)
         ) else {
             return nil
         }
         return response.signedURL
+    }
+
+    func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        try decoder.decode(type, from: data)
     }
 
     private func refresh(session: StoredSupabaseSession) async throws -> StoredSupabaseSession {
@@ -410,6 +498,100 @@ private struct SupabaseClient: Sendable {
     private var iso8601: ISO8601DateFormatter { .stacks }
 }
 
+struct SupabaseProEntitlementService: Sendable {
+    private struct Request: Encodable { let transactionID: String? }
+    struct Status: Decodable { let isPro: Bool; let expiresAt: Date? }
+
+    func sync(transactionID: String? = nil) async throws -> Status {
+        guard let configuration = SupabaseConfiguration.fromAppBundle() else {
+            throw AppError.unavailable("Supabase is not configured.")
+        }
+        let response: Status = try await SupabaseClient(configuration: configuration)
+            .function("sync-pro-entitlement", body: Request(transactionID: transactionID))
+        return response
+    }
+}
+
+struct SupabasePushTokenService: Sendable {
+    private struct Request: Encodable {
+        let deviceToken: String
+        let platform = "ios"
+        let environment: String
+    }
+
+    func register(deviceToken: String) async throws {
+        guard let configuration = SupabaseConfiguration.fromAppBundle() else { return }
+        #if DEBUG
+        let environment = "sandbox"
+        #else
+        let environment = "production"
+        #endif
+        let _: EmptyFunctionResponse = try await SupabaseClient(configuration: configuration)
+            .function("register-push-token", body: Request(deviceToken: deviceToken, environment: environment))
+    }
+}
+
+struct SupabasePriceAlertService: Sendable {
+    struct Listing: Decodable, Sendable {
+        let alerts: [PriceAlert]
+        let events: [PriceAlertEvent]
+        let notificationsEnabled: Bool
+    }
+
+    private struct Request: Encodable {
+        let action: String
+        var itemID: UUID?
+        var alertID: UUID?
+        var eventID: UUID?
+        var mode: String?
+        var targetPrice: Decimal?
+        var paused: Bool?
+        var enabled: Bool?
+        var linkToken: UUID?
+    }
+    private struct Response: Decodable { let enabled: Bool? }
+
+    private func client() throws -> SupabaseClient {
+        guard let configuration = SupabaseConfiguration.fromAppBundle() else {
+            throw AppError.unavailable("Price alerts are not configured for this build.")
+        }
+        return SupabaseClient(configuration: configuration)
+    }
+
+    func list() async throws -> Listing {
+        try await client().function("price-alerts", body: Request(action: "list"))
+    }
+
+    func save(itemID: UUID, mode: PriceAlertMode, targetPrice: Decimal?, linkToken: UUID?) async throws {
+        let _: Response = try await client().function(
+            "price-alerts",
+            body: Request(action: "upsert", itemID: itemID, mode: mode.rawValue, targetPrice: targetPrice, linkToken: linkToken)
+        )
+    }
+
+    func delete(alertID: UUID) async throws {
+        let _: Response = try await client().function("price-alerts", body: Request(action: "delete", alertID: alertID))
+    }
+
+    func setPaused(_ paused: Bool, alertID: UUID) async throws {
+        let _: Response = try await client().function(
+            "price-alerts", body: Request(action: "set_status", alertID: alertID, paused: paused)
+        )
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool) async throws {
+        let _: Response = try await client().function(
+            "price-alerts", body: Request(action: "set_notifications", enabled: enabled)
+        )
+    }
+
+    func markRead(eventID: UUID) async throws {
+        let _: Response = try await client().function("price-alerts", body: Request(action: "mark_read", eventID: eventID))
+    }
+}
+
+private struct EmptyFunctionResponse: Decodable {}
+
 struct SupabaseAuthService: AuthService {
     private let client: SupabaseClient
 
@@ -431,6 +613,18 @@ struct SupabaseAuthService: AuthService {
         return try await client.exchangeAppleIdentityToken(identityToken)
     }
 
+    func signInWithGoogle() async throws -> AuthSession {
+        let authorization = try await client.googleOAuthAuthorizationURL()
+        let callbackURL = try await OAuthSignInAuthorizer.authorize(
+            url: authorization.url,
+            callbackScheme: authorization.callbackScheme
+        )
+        guard let session = try await handleAuthCallback(callbackURL) else {
+            throw AppError.unavailable("Google did not return a sign-in callback. Please try again.")
+        }
+        return session
+    }
+
     func signInWithEmail(_ email: String) async throws -> EmailAuthenticationResult {
         guard email.contains("@"), email.contains(".") else { throw AppError.invalidEmail }
         try await client.sendMagicLink(email: email)
@@ -438,7 +632,7 @@ struct SupabaseAuthService: AuthService {
     }
 
     func handleAuthCallback(_ url: URL) async throws -> AuthSession? {
-        guard url.scheme?.lowercased() == "stacks" else { return nil }
+        guard url.scheme?.lowercased() == "stacks", url.host?.lowercased() == "auth" else { return nil }
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let query = Dictionary(uniqueKeysWithValues: (components?.queryItems ?? []).map { ($0.name, $0.value ?? "") })
         let fragment = Dictionary(uniqueKeysWithValues: (components?.fragment ?? "")
@@ -463,6 +657,10 @@ struct SupabaseAuthService: AuthService {
             expiresIn: expiresIn,
             user: nil
         ))
+    }
+
+    func recordLegalAcceptance(for userID: UUID, version: String) async throws {
+        try await client.recordLegalAcceptance(id: userID, version: version)
     }
 
     func completeOnboarding(for userID: UUID) async throws {
@@ -516,6 +714,52 @@ fileprivate final class AppleSignInAuthorizer: NSObject, ASAuthorizationControll
     }
 }
 
+@MainActor
+fileprivate final class OAuthSignInAuthorizer: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private var continuation: CheckedContinuation<URL, Error>?
+    private var session: ASWebAuthenticationSession?
+
+    static func authorize(url: URL, callbackScheme: String) async throws -> URL {
+        let authorizer = OAuthSignInAuthorizer()
+        return try await authorizer.start(url: url, callbackScheme: callbackScheme)
+    }
+
+    private func start(url: URL, callbackScheme: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            let session = ASWebAuthenticationSession(
+                url: url,
+                callbackURLScheme: callbackScheme
+            ) { [weak self] callbackURL, error in
+                guard let self else { return }
+                if let callbackURL {
+                    self.continuation?.resume(returning: callbackURL)
+                } else {
+                    self.continuation?.resume(throwing: error ?? ASWebAuthenticationSessionError(.canceledLogin))
+                }
+                self.continuation = nil
+                self.session = nil
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+            self.session = session
+            guard session.start() else {
+                self.continuation?.resume(throwing: AppError.unavailable("Could not open Google sign-in. Please try again."))
+                self.continuation = nil
+                self.session = nil
+                return
+            }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: { $0.isKeyWindow }) ?? ASPresentationAnchor()
+    }
+}
+
 struct SupabaseStackRepository: StackRepository {
     private let client: SupabaseClient
 
@@ -524,10 +768,29 @@ struct SupabaseStackRepository: StackRepository {
     }
 
     func fetchMyStacks(for userID: UUID) async throws -> [Stack] {
+        let collaboratorRows: [StackCollaboratorAccessRow] = try await client.rest(
+            "stack_collaborators",
+            query: [
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)"),
+                URLQueryItem(name: "accepted_at", value: "not.is.null"),
+                URLQueryItem(name: "select", value: "stack_id")
+            ]
+        )
+        let collaboratorIDs = collaboratorRows.map(\.stackID)
+        let accessFilter: URLQueryItem
+        if collaboratorIDs.isEmpty {
+            accessFilter = URLQueryItem(name: "owner_id", value: "eq.\(userID.uuidString)")
+        } else {
+            let ids = collaboratorIDs.map(\.uuidString).joined(separator: ",")
+            accessFilter = URLQueryItem(
+                name: "or",
+                value: "(owner_id.eq.\(userID.uuidString),id.in.(\(ids)))"
+            )
+        }
         let rows: [StackRow] = try await client.rest(
             "stacks",
             query: [
-                URLQueryItem(name: "owner_id", value: "eq.\(userID.uuidString)"),
+                accessFilter,
                 URLQueryItem(name: "select", value: "*"),
                 URLQueryItem(name: "order", value: "updated_at.desc")
             ]
@@ -535,17 +798,52 @@ struct SupabaseStackRepository: StackRepository {
         return try await compose(rows: rows, viewerID: userID)
     }
 
-    func fetchDiscoverStacks(query: String?) async throws -> [Stack] {
-        let viewer = try await client.authUser()
-        let rows: [StackRow] = try await client.rest(
+    func fetchOwnedStackDestinations(for user: UserProfile) async throws -> [SharedStackDestination] {
+        // The Share Sheet only needs owned Stack names. Fetching full Stacks
+        // also fetches items and collaborators, so an unrelated failure there
+        // must not make an owner's destinations disappear.
+        let rows: [OwnedStackDestinationRow] = try await client.rest(
             "stacks",
             query: [
-                URLQueryItem(name: "visibility", value: "eq.public"),
-                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "owner_id", value: "eq.\(user.id.uuidString)"),
+                URLQueryItem(name: "select", value: "id,title,updated_at"),
                 URLQueryItem(name: "order", value: "updated_at.desc")
             ]
         )
-        let stacks = try await compose(rows: rows, viewerID: viewer.id)
+        return rows.map {
+            SharedStackDestination(
+                id: $0.id,
+                title: $0.title,
+                ownerName: user.displayName,
+                avatarURL: user.avatarURL,
+                updatedAt: $0.updatedAt
+            )
+        }
+    }
+
+    func fetchStack(id: UUID, for userID: UUID) async throws -> Stack {
+        try await fetchStack(id: id, viewerID: userID)
+    }
+
+    func fetchDiscoverStacks(query: String?) async throws -> [Stack] {
+        let curated = (try? await CuratedStackCatalog.fetchStacks()) ?? []
+        let viewer = try await client.authUser()
+        let liveStacks: [Stack]
+        do {
+            let rows: [StackRow] = try await client.rest(
+                "stacks",
+                query: [
+                    URLQueryItem(name: "visibility", value: "eq.public"),
+                    URLQueryItem(name: "select", value: "*"),
+                    URLQueryItem(name: "order", value: "updated_at.desc")
+                ]
+            )
+            liveStacks = try await compose(rows: rows, viewerID: viewer.id)
+        } catch {
+            guard !curated.isEmpty else { throw error }
+            liveStacks = []
+        }
+        let stacks = (curated + liveStacks).sorted(by: discoverSort)
         guard let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return stacks }
         return stacks.filter {
             $0.title.localizedCaseInsensitiveContains(query)
@@ -554,15 +852,22 @@ struct SupabaseStackRepository: StackRepository {
         }
     }
 
-    func createStack(title: String, wishlistMode: Bool, owner: UserProfile) async throws -> Stack {
+    private func discoverSort(_ lhs: Stack, _ rhs: Stack) -> Bool {
+        if lhs.isFollowingAuthor != rhs.isFollowingAuthor {
+            return lhs.isFollowingAuthor
+        }
+        return lhs.updatedAt > rhs.updatedAt
+    }
+
+    func createStack(title: String, wishlistMode: Bool, visibility: StackVisibility, owner: UserProfile) async throws -> Stack {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanTitle.isEmpty else { throw AppError.missingRequiredField("Title") }
         let body = try JSONEncoder().encode(StackWrite(
             ownerID: owner.id,
             title: cleanTitle,
-            summary: "",
-            visibility: "private",
-            wishlistMode: wishlistMode
+            visibility: visibility.databaseValue,
+            wishlistMode: wishlistMode,
+            collaborationEnabled: false
         ))
         let rows: [StackRow] = try await decodeRest(
             "stacks",
@@ -577,11 +882,87 @@ struct SupabaseStackRepository: StackRepository {
         return stack
     }
 
+    func fetchSharedStack(token: UUID) async throws -> Stack {
+        struct SharedPayload: Decodable {
+            let stack: StackRow
+            let items: [ItemRow]
+        }
+
+        let body = try JSONEncoder().encode(["link_token": token.uuidString])
+        let data = try await client.restData("rpc/get_link_only_stack", method: "POST", body: body)
+        let payload = try client.decode(SharedPayload.self, from: data)
+        let author = (try? await client.profileRow(id: payload.stack.ownerID))?.profile(using: client.configuration)
+            ?? UserProfile(
+                id: payload.stack.ownerID,
+                displayName: "Stacks member",
+                username: "stacker",
+                avatarURL: nil,
+                bio: "",
+                linkInBioURL: nil,
+                isFollowing: false
+            )
+        let mappedItems = await mapItems(payload.items, stackID: payload.stack.id, linkToken: token)
+        return Stack(
+            id: payload.stack.id,
+            ownerID: payload.stack.ownerID,
+            author: author,
+            title: payload.stack.title,
+            visibility: .publicLink,
+            wishlistMode: payload.stack.wishlistMode,
+            collaborationEnabled: payload.stack.collaborationEnabled,
+            collaborators: [],
+            items: mappedItems,
+            publicLinkToken: token,
+            createdAt: payload.stack.createdAt,
+            updatedAt: payload.stack.updatedAt,
+            isBookmarked: false,
+            isFollowingAuthor: false
+        )
+    }
+
     func copyStack(_ stack: Stack, to owner: UserProfile) async throws -> Stack {
         struct CopyRequest: Encodable { let stackID: UUID; let title: String }
         struct CopyResponse: Decodable { let stackID: UUID }
         let response: CopyResponse = try await client.function("copy-public-stack", body: CopyRequest(stackID: stack.id, title: "\(stack.title) copy"))
         return try await fetchStack(id: response.stackID, viewerID: owner.id)
+    }
+
+    func updateStack(_ stack: Stack) async throws -> Stack {
+        let body = try JSONEncoder().encode(StackWrite(
+            ownerID: stack.ownerID,
+            title: stack.title,
+            visibility: stack.visibility.databaseValue,
+            wishlistMode: stack.wishlistMode,
+            collaborationEnabled: stack.collaborationEnabled
+        ))
+        _ = try await client.restData(
+            "stacks",
+            query: [URLQueryItem(name: "id", value: "eq.\(stack.id.uuidString)")],
+            method: "PATCH",
+            body: body
+        )
+        let viewer = try await client.authUser()
+        return try await fetchStack(id: stack.id, viewerID: viewer.id)
+    }
+
+    func rotateWishlistLink(stackID: UUID, revoke: Bool) async throws -> Stack {
+        struct Request: Encodable {
+            let targetStackID: UUID
+            let revokeLink: Bool
+            enum CodingKeys: String, CodingKey { case targetStackID = "target_stack_id", revokeLink = "revoke_link" }
+        }
+        let body = try JSONEncoder().encode(Request(targetStackID: stackID, revokeLink: revoke))
+        _ = try await client.restData("rpc/rotate_wishlist_link", method: "POST", body: body)
+        let viewer = try await client.authUser()
+        return try await fetchStack(id: stackID, viewerID: viewer.id)
+    }
+
+    func deleteStack(id: UUID) async throws {
+        _ = try await client.restData(
+            "stacks",
+            query: [URLQueryItem(name: "id", value: "eq.\(id.uuidString)")],
+            method: "DELETE"
+        )
     }
 
     func addItem(_ item: StackItem, to stackID: UUID) async throws -> Stack {
@@ -676,6 +1057,13 @@ struct SupabaseStackRepository: StackRepository {
     }
 
     private func fetchStack(id: UUID, viewerID: UUID) async throws -> Stack {
+        if CuratedStackCatalog.isCuratedStack(id) {
+            let curated = try await CuratedStackCatalog.fetchStacks()
+            guard let stack = curated.first(where: { $0.id == id }) else {
+                throw AppError.notFound
+            }
+            return stack
+        }
         let rows: [StackRow] = try await client.rest(
             "stacks",
             query: [
@@ -683,7 +1071,12 @@ struct SupabaseStackRepository: StackRepository {
                 URLQueryItem(name: "select", value: "*")
             ]
         )
-        guard let stack = try await compose(rows: rows, viewerID: viewerID).first else { throw AppError.notFound }
+        guard let stack = try await compose(rows: rows, viewerID: viewerID).first else {
+            if let curated = (try? await CuratedStackCatalog.fetchStacks())?.first(where: { $0.id == id }) {
+                return curated
+            }
+            throw AppError.notFound
+        }
         return stack
     }
 
@@ -691,13 +1084,22 @@ struct SupabaseStackRepository: StackRepository {
         guard !rows.isEmpty else { return [] }
         let stackIDs = rows.map(\.id)
         let ownerIDs = Array(Set(rows.map(\.ownerID)))
-        let ownerList = ownerIDs.map(\.uuidString).joined(separator: ",")
         let stackList = stackIDs.map(\.uuidString).joined(separator: ",")
 
+        let collaboratorRows: [StackCollaboratorRow] = try await client.rest(
+            "stack_collaborators",
+            query: [
+                URLQueryItem(name: "stack_id", value: "in.(\(stackList))"),
+                URLQueryItem(name: "accepted_at", value: "not.is.null"),
+                URLQueryItem(name: "select", value: "stack_id,user_id,permission,accepted_at,created_at")
+            ]
+        )
+        let profileIDs = Array(Set(ownerIDs + collaboratorRows.map(\.userID)))
+        let profileList = profileIDs.map(\.uuidString).joined(separator: ",")
         let profiles: [ProfileRow] = try await client.rest(
             "profiles",
             query: [
-                URLQueryItem(name: "id", value: "in.(\(ownerList))"),
+                URLQueryItem(name: "id", value: "in.(\(profileList))"),
                 URLQueryItem(name: "select", value: "*")
             ]
         )
@@ -725,8 +1127,9 @@ struct SupabaseStackRepository: StackRepository {
             ]
         )
 
-        let profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.profile) })
+        let profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.profile(using: client.configuration)) })
         let itemsByStack = Dictionary(grouping: items, by: \.stackID)
+        let collaboratorsByStack = Dictionary(grouping: collaboratorRows, by: \.stackID)
         let pinnedStackIDs = Set(pins.map(\.stackID))
         let followedIDs = Set(follows.compactMap(\.followedUserID))
 
@@ -741,17 +1144,45 @@ struct SupabaseStackRepository: StackRepository {
                 linkInBioURL: nil,
                 isFollowing: followedIDs.contains(row.ownerID)
             )
-            let mappedItems = await mapItems(itemsByStack[row.id] ?? [], stackID: row.id)
+            var mappedItems = await mapItems(itemsByStack[row.id] ?? [], stackID: row.id)
+            if row.wishlistMode && row.ownerID != viewerID {
+                struct ClaimState: Decodable {
+                    let itemID: UUID
+                    let status: GiftClaimStatus?
+                    enum CodingKeys: String, CodingKey { case itemID = "item_id", status }
+                }
+                struct Request: Encodable {
+                    let targetStackID: UUID
+                    let linkToken: UUID?
+                    enum CodingKeys: String, CodingKey { case targetStackID = "target_stack_id", linkToken = "link_token" }
+                }
+                if let request = try? JSONEncoder().encode(Request(targetStackID: row.id, linkToken: nil)),
+                   let data = try? await client.restData("rpc/get_wishlist_claim_states", method: "POST", body: request),
+                   let states = try? JSONDecoder().decode([ClaimState].self, from: data) {
+                    let byItem = Dictionary(uniqueKeysWithValues: states.map { ($0.itemID, $0.status) })
+                    for index in mappedItems.indices { mappedItems[index].claimStatus = byItem[mappedItems[index].id] ?? nil }
+                }
+            }
+            let collaborators = (collaboratorsByStack[row.id] ?? []).compactMap { collaborator -> Collaborator? in
+                guard let profile = profileByID[collaborator.userID] else { return nil }
+                return Collaborator(
+                    id: collaborator.userID,
+                    user: profile,
+                    permission: collaborator.permission == "viewer" ? .view : .edit,
+                    invitedAt: collaborator.acceptedAt ?? collaborator.createdAt
+                )
+            }
             output.append(Stack(
                 id: row.id,
                 ownerID: row.ownerID,
                 author: author,
                 title: row.title,
-                summary: row.summary,
                 visibility: StackVisibility(databaseValue: row.visibility),
                 wishlistMode: row.wishlistMode,
-                collaborators: [],
+                collaborationEnabled: row.collaborationEnabled,
+                collaborators: collaborators,
                 items: mappedItems,
+                publicLinkToken: row.publicLinkToken,
                 createdAt: row.createdAt,
                 updatedAt: row.updatedAt,
                 isBookmarked: pinnedStackIDs.contains(row.id),
@@ -761,28 +1192,28 @@ struct SupabaseStackRepository: StackRepository {
         return output
     }
 
-    private func mapItems(_ rows: [ItemRow], stackID: UUID) async -> [StackItem] {
-        await withTaskGroup(of: StackItem.self) { group in
-            for row in rows {
+    private func mapItems(_ rows: [ItemRow], stackID: UUID, linkToken: UUID? = nil) async -> [StackItem] {
+        await withTaskGroup(of: (Int, StackItem).self) { group in
+            for (index, row) in rows.enumerated() {
                 group.addTask {
                     let originalURL: URL?
                     if let path = row.originalImagePath {
-                        originalURL = await self.client.signedMediaURL(path: path, stackID: stackID)
+                        originalURL = await self.client.signedMediaURL(path: path, stackID: stackID, linkToken: linkToken)
                     } else {
                         originalURL = nil
                     }
                     let removedURL: URL?
                     if let path = row.removedBackgroundImagePath {
-                        removedURL = await self.client.signedMediaURL(path: path, stackID: stackID)
+                        removedURL = await self.client.signedMediaURL(path: path, stackID: stackID, linkToken: linkToken)
                     } else {
                         removedURL = nil
                     }
-                    return row.stackItem(originalImageURL: originalURL, removedBackgroundImageURL: removedURL)
+                    return (index, row.stackItem(originalImageURL: originalURL, removedBackgroundImageURL: removedURL))
                 }
             }
-            var items: [StackItem] = []
-            for await item in group { items.append(item) }
-            return items
+            var indexedItems: [(Int, StackItem)] = []
+            for await result in group { indexedItems.append(result) }
+            return indexedItems.sorted { $0.0 < $1.0 }.map(\.1)
         }
     }
 
@@ -869,7 +1300,55 @@ struct SupabaseProfileRepository: ProfileRepository {
 
     func currentProfile(for session: AuthSession) async throws -> UserProfile {
         guard let profile = try await client.profileRow(id: session.userID) else { throw AppError.notFound }
-        return profile.profile
+        return profile.profile(using: client.configuration)
+    }
+
+    func enableProfileSharing() async throws {
+        _ = try await client.restData("rpc/enable_profile_sharing", method: "POST", body: Data("{}".utf8))
+    }
+
+    func disableProfileSharing() async throws {
+        let user = try await client.authUser()
+        _ = try await client.restData(
+            "profiles",
+            query: [URLQueryItem(name: "id", value: "eq.\(user.id.uuidString)")],
+            method: "PATCH",
+            body: Data("{\"profile_share_enabled\":false}".utf8)
+        )
+    }
+
+    func updateProfile(_ profile: UserProfile, avatarData: Data?) async throws -> UserProfile {
+        let avatarPath: String?
+        if let avatarData {
+            avatarPath = try await client.uploadProfileAvatar(avatarData, ownerID: profile.id)
+        } else {
+            avatarPath = nil
+        }
+        let body = try JSONEncoder().encode(ProfileUpdatePayload(
+            displayName: profile.displayName,
+            username: profile.username,
+            bio: profile.bio,
+            avatarPath: avatarPath
+        ))
+        let data = try await client.restData(
+            "profiles",
+            query: [URLQueryItem(name: "id", value: "eq.\(profile.id.uuidString)")],
+            method: "PATCH",
+            body: body,
+            preferRepresentation: true
+        )
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            guard let date = ISO8601DateFormatter.stacks.date(from: value) else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date")
+            }
+            return date
+        }
+        let rows = try decoder.decode([ProfileRow].self, from: data)
+        guard let updated = rows.first else { throw AppError.notFound }
+        return updated.profile(using: client.configuration)
     }
 
     func suggestedCreators() async throws -> [UserProfile] {
@@ -892,7 +1371,39 @@ struct SupabaseProfileRepository: ProfileRepository {
         )
         let followed = Set(follows.map(\.followedUserID))
         return profiles.map { row in
-            var profile = row.profile
+            var profile = row.profile(using: client.configuration)
+            profile.isFollowing = followed.contains(row.id)
+            return profile
+        }
+    }
+
+    func searchCreators(query: String) async throws -> [UserProfile] {
+        let user = try await client.authUser()
+        let cleanQuery = query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .filter { $0.isLetter || $0.isNumber || $0 == " " || $0 == "_" || $0 == "-" }
+        guard !cleanQuery.isEmpty else { return try await suggestedCreators() }
+
+        let profiles: [ProfileRow] = try await client.rest(
+            "profiles",
+            query: [
+                URLQueryItem(name: "discovery_enabled", value: "eq.true"),
+                URLQueryItem(name: "id", value: "neq.\(user.id.uuidString)"),
+                URLQueryItem(name: "or", value: "(display_name.ilike.*\(cleanQuery)*,username.ilike.*\(cleanQuery)*)"),
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "limit", value: "20")
+            ]
+        )
+        let follows: [FollowRow] = try await client.rest(
+            "follows",
+            query: [
+                URLQueryItem(name: "follower_id", value: "eq.\(user.id.uuidString)"),
+                URLQueryItem(name: "select", value: "followed_user_id")
+            ]
+        )
+        let followed = Set(follows.compactMap(\.followedUserID))
+        return profiles.map { row in
+            var profile = row.profile(using: client.configuration)
             profile.isFollowing = followed.contains(row.id)
             return profile
         }
@@ -1098,6 +1609,7 @@ private struct ProfileRow: Decodable {
     let bio: String
     let linkInBioURL: String?
     let onboardingCompletedAt: Date?
+    let profileShareEnabled: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1107,18 +1619,52 @@ private struct ProfileRow: Decodable {
         case bio
         case linkInBioURL = "link_in_bio_url"
         case onboardingCompletedAt = "onboarding_completed_at"
+        case profileShareEnabled = "profile_share_enabled"
     }
 
-    var profile: UserProfile {
+    func profile(using configuration: SupabaseConfiguration) -> UserProfile {
         UserProfile(
             id: id,
             displayName: displayName,
             username: username,
-            avatarURL: nil,
+            avatarURL: avatarPath.flatMap { Self.publicAvatarURL(path: $0, configuration: configuration) },
             bio: bio,
             linkInBioURL: linkInBioURL.flatMap(URL.init(string:)),
-            isFollowing: false
+            isFollowing: false,
+            profileShareEnabled: profileShareEnabled
         )
+    }
+
+    private static func publicAvatarURL(path: String, configuration: SupabaseConfiguration) -> URL? {
+        let encodedPath = path.split(separator: "/").map {
+            String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0)
+        }.joined(separator: "/")
+        return configuration.projectURL.appending(path: "storage/v1/object/public/profile-media/\(encodedPath)")
+    }
+}
+
+private struct ProfileUpdatePayload: Encodable {
+    let displayName: String
+    let username: String
+    let bio: String
+    let avatarPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case displayName = "display_name"
+        case username
+        case bio
+        case avatarPath = "avatar_path"
+    }
+}
+
+private struct OwnedStackDestinationRow: Decodable {
+    let id: UUID
+    let title: String
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case updatedAt = "updated_at"
     }
 }
 
@@ -1126,9 +1672,10 @@ private struct StackRow: Decodable {
     let id: UUID
     let ownerID: UUID
     let title: String
-    let summary: String
     let visibility: String
     let wishlistMode: Bool
+    let collaborationEnabled: Bool
+    let publicLinkToken: UUID?
     let createdAt: Date
     let updatedAt: Date
 
@@ -1136,11 +1683,36 @@ private struct StackRow: Decodable {
         case id
         case ownerID = "owner_id"
         case title
-        case summary
         case visibility
         case wishlistMode = "wishlist_mode"
+        case collaborationEnabled = "collaboration_enabled"
+        case publicLinkToken = "public_link_token"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+private struct StackCollaboratorAccessRow: Decodable {
+    let stackID: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case stackID = "stack_id"
+    }
+}
+
+private struct StackCollaboratorRow: Decodable {
+    let stackID: UUID
+    let userID: UUID
+    let permission: String
+    let acceptedAt: Date?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case stackID = "stack_id"
+        case userID = "user_id"
+        case permission
+        case acceptedAt = "accepted_at"
+        case createdAt = "created_at"
     }
 }
 
@@ -1164,6 +1736,7 @@ private struct ItemRow: Decodable {
     let rotationDegrees: Double
     let hasCustomPlacement: Bool
     let sourceType: String
+    let claimStatus: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -1185,6 +1758,7 @@ private struct ItemRow: Decodable {
         case rotationDegrees = "rotation_degrees"
         case hasCustomPlacement = "has_custom_placement"
         case sourceType = "source_type"
+        case claimStatus = "claim_status"
     }
 
     func stackItem(originalImageURL: URL?, removedBackgroundImageURL: URL?) -> StackItem {
@@ -1210,7 +1784,7 @@ private struct ItemRow: Decodable {
             ),
             hasCustomPlacement: hasCustomPlacement,
             addSource: AddItemSource(databaseValue: sourceType),
-            claimStatus: nil,
+            claimStatus: claimStatus.flatMap(GiftClaimStatus.init(rawValue:)),
             demoGlyph: nil
         )
     }
@@ -1241,16 +1815,16 @@ private struct FollowRow: Decodable {
 private struct StackWrite: Encodable {
     let ownerID: UUID
     let title: String
-    let summary: String
     let visibility: String
     let wishlistMode: Bool
+    let collaborationEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
         case ownerID = "owner_id"
         case title
-        case summary
         case visibility
         case wishlistMode = "wishlist_mode"
+        case collaborationEnabled = "collaboration_enabled"
     }
 }
 
@@ -1339,6 +1913,14 @@ private extension StackVisibility {
         default: self = .private
         }
     }
+
+    var databaseValue: String {
+        switch self {
+        case .private, .inviteOnly: "private"
+        case .publicLink: "link_only"
+        case .publicDiscover: "public"
+        }
+    }
 }
 
 private extension AddItemSource {
@@ -1418,7 +2000,34 @@ struct ProductLinkParserConfiguration: Sendable {
         guard (200...299).contains(httpResponse.statusCode) else {
             throw AppError.unavailable(decoded.error ?? "We couldn't read that product link.")
         }
-        return decoded.item.productLinkPreview
+        var preview = decoded.item.productLinkPreview
+        preview.importWarning = decoded.warning
+        preview.importWarningCode = decoded.warningCode
+        let shouldRepairTitle = ProductImportedCopy.isGenericTitle(
+            preview.title,
+            brand: preview.brand,
+            sourceURL: url
+        )
+        if decoded.warning != nil || preview.imageURL == nil || shouldRepairTitle {
+            // Etsy, Depop, and other marketplaces commonly reject datacenter
+            // requests while still providing rich metadata through Apple's
+            // on-device link service. A backend fallback is not a completed
+            // import; merge in the device result before returning it.
+            let devicePreview = await ProductPageImageExtractor.previewProductLink(for: url)
+            if let deviceImage = devicePreview.imageURL {
+                preview.imageURL = deviceImage
+            }
+            if shouldRepairTitle
+                || preview.title == ProductPageImageExtractor.fallbackTitle(for: url)
+                || preview.title.count > 80 {
+                preview.title = devicePreview.title
+            }
+            if preview.brand.isEmpty { preview.brand = devicePreview.brand }
+            if preview.shortDescription.isEmpty { preview.shortDescription = devicePreview.shortDescription }
+            if preview.price == nil { preview.price = devicePreview.price }
+        }
+        preview.title = ProductImportedCopy.conciseTitle(preview.title, brand: preview.brand)
+        return preview
     }
 
     private static func configuredString(for key: String) -> String? {
@@ -1435,6 +2044,7 @@ private struct ProductLinkParserRequest: Encodable {
 private struct ProductLinkParserResponse: Decodable {
     let item: ProductLinkParserItem
     let warning: String?
+    let warningCode: String?
     let error: String?
 }
 
@@ -1526,20 +2136,236 @@ struct EdgeFunctionBackgroundRemovalService: BackgroundRemovalService {
 }
 
 struct EdgeFunctionAffiliateService: AffiliateService {
-    func affiliateURL(for url: URL) async throws -> URL {
-        throw AppError.configurationRequired("Sovrn affiliate edge function")
+    private let client: SupabaseClient
+
+    init(configuration: SupabaseConfiguration) {
+        client = SupabaseClient(configuration: configuration)
+    }
+
+    func resolveLink(for url: URL, countryCode: String?) async throws -> AffiliateLinkResolution {
+        struct Request: Encodable {
+            let url: URL
+            let countryCode: String?
+        }
+        struct Response: Decodable {
+            let affiliateURL: URL
+            let isCommissionable: Bool
+        }
+        let response: Response = try await client.function(
+            "affiliate-link",
+            body: Request(url: url, countryCode: countryCode)
+        )
+        return AffiliateLinkResolution(url: response.affiliateURL, isCommissionable: response.isCommissionable)
     }
 }
 
 struct EdgeFunctionClaimService: ClaimService {
-    func claim(item: StackItem, claimerName: String) async throws -> GiftClaim {
-        throw AppError.configurationRequired("gift-claim edge function")
+    private let client: SupabaseClient
+
+    init(configuration: SupabaseConfiguration) {
+        client = SupabaseClient(configuration: configuration)
+    }
+
+    func myClaimStatus(for item: StackItem) async throws -> GiftClaimStatus? {
+        struct OwnClaim: Decodable { let status: GiftClaimStatus }
+        let user = try await client.authUser()
+        let claims: [OwnClaim] = try await client.rest("gift_claims", query: [
+            URLQueryItem(name: "item_id", value: "eq.\(item.id.uuidString)"),
+            URLQueryItem(name: "claimer_id", value: "eq.\(user.id.uuidString)"),
+            URLQueryItem(name: "status", value: "in.(claimed,purchased)"),
+            URLQueryItem(name: "select", value: "status"),
+            URLQueryItem(name: "limit", value: "1")
+        ])
+        return claims.first?.status
+    }
+
+    func claim(item: StackItem, in stack: Stack, claimerName: String) async throws -> GiftClaim {
+        struct ClaimRequest: Encodable {
+            let stackID: UUID
+            let itemID: UUID
+            let claimerName: String
+            let linkToken: UUID?
+        }
+        struct ClaimResponse: Decodable {
+            let claim: ClaimRow
+        }
+        struct ClaimRow: Decodable {
+            let id: UUID
+            let stackID: UUID
+            let itemID: UUID
+            let claimerName: String
+            let privateMessage: String?
+            let status: GiftClaimStatus
+            let createdAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case id
+                case stackID
+                case itemID
+                case claimerName
+                case privateMessage
+                case status
+                case createdAt
+            }
+        }
+
+        let response: ClaimResponse = try await client.function(
+            "claim-gift",
+            body: ClaimRequest(
+                stackID: item.stackID,
+                itemID: item.id,
+                claimerName: claimerName,
+                linkToken: stack.visibility == .publicLink ? stack.publicLinkToken : nil
+            )
+        )
+        return GiftClaim(
+            id: response.claim.id,
+            itemID: response.claim.itemID,
+            stackID: response.claim.stackID,
+            claimerName: response.claim.claimerName,
+            privateMessage: response.claim.privateMessage,
+            status: response.claim.status,
+            createdAt: response.claim.createdAt
+        )
+    }
+
+    func updateStatus(
+        for item: StackItem,
+        in stack: Stack,
+        status: GiftClaimStatus?
+    ) async throws -> GiftClaimStatus? {
+        struct StatusRequest: Encodable {
+            let stackID: UUID
+            let itemID: UUID
+            let status: String?
+        }
+        struct StatusResponse: Decodable {
+            let status: GiftClaimStatus?
+        }
+        let response: StatusResponse = try await client.function(
+            "update-gift-claim",
+            body: StatusRequest(stackID: stack.id, itemID: item.id, status: status?.rawValue)
+        )
+        return response.status
     }
 }
 
 struct SupabaseCollaborationService: CollaborationService {
-    func invite(email: String, to stack: Stack) async throws -> Collaborator {
-        throw AppError.configurationRequired("Supabase collaborators table")
+    private let client: SupabaseClient
+
+    init(configuration: SupabaseConfiguration) {
+        client = SupabaseClient(configuration: configuration)
+    }
+
+    func createInvite(to stack: Stack, permission: CollaboratorPermission) async throws -> CollaborationInvite {
+        struct InviteRequest: Encodable { let stackID: UUID; let permission: String }
+        struct InviteResponse: Decodable {
+            let invite: Invite
+            struct Invite: Decodable {
+                let id: UUID
+                let stackID: UUID
+                let token: UUID
+                let permission: String
+                let expiresAt: Date
+
+                enum CodingKeys: String, CodingKey {
+                    case id, token, permission
+                    case stackID = "stackId"
+                    case expiresAt = "expiresAt"
+                }
+            }
+        }
+        let databasePermission = permission == .view ? "viewer" : "editor"
+        let response: InviteResponse = try await client.function(
+            "create-collaboration-invite",
+            body: InviteRequest(stackID: stack.id, permission: databasePermission)
+        )
+        return CollaborationInvite(
+            id: response.invite.id,
+            stackID: response.invite.stackID,
+            token: response.invite.token,
+            permission: response.invite.permission == "viewer" ? .view : .edit,
+            expiresAt: response.invite.expiresAt
+        )
+    }
+
+    func previewInvite(token: UUID) async throws -> CollaborationInvitePreview {
+        struct PreviewRequest: Encodable { let token: UUID }
+        struct PreviewResponse: Decodable {
+            let stackID: UUID
+            let stackTitle: String
+            let permission: String
+            let expiresAt: Date
+            let ownerID: UUID
+            let ownerName: String
+            let ownerUsername: String
+            let ownerAvatarPath: String?
+        }
+        let response: PreviewResponse = try await client.function(
+            "preview-collaboration-invite",
+            body: PreviewRequest(token: token)
+        )
+        let avatarURL = response.ownerAvatarPath.map { path in
+            let encodedPath = path.split(separator: "/").map {
+                String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0)
+            }.joined(separator: "/")
+            return client.configuration.projectURL.appending(path: "storage/v1/object/public/profile-media/\(encodedPath)")
+        }
+        return CollaborationInvitePreview(
+            token: token,
+            stackID: response.stackID,
+            stackTitle: response.stackTitle,
+            owner: UserProfile(
+                id: response.ownerID,
+                displayName: response.ownerName,
+                username: response.ownerUsername,
+                avatarURL: avatarURL,
+                bio: "",
+                linkInBioURL: nil,
+                isFollowing: false
+            ),
+            permission: response.permission == "viewer" ? .view : .edit,
+            expiresAt: response.expiresAt
+        )
+    }
+
+    func acceptInvite(token: UUID) async throws -> UUID {
+        struct AcceptRequest: Encodable { let token: UUID }
+        struct AcceptResponse: Decodable { let accepted: Bool; let stackID: UUID }
+        let response: AcceptResponse = try await client.function(
+            "accept-collaboration-invite",
+            body: AcceptRequest(token: token)
+        )
+        return response.stackID
+    }
+
+    func setCollaborationEnabled(stackID: UUID, enabled: Bool) async throws {
+        struct CollaborationUpdate: Encodable {
+            let collaborationEnabled: Bool
+            enum CodingKeys: String, CodingKey { case collaborationEnabled = "collaboration_enabled" }
+        }
+        _ = try await client.restData(
+            "stacks",
+            query: [URLQueryItem(name: "id", value: "eq.\(stackID.uuidString)")],
+            method: "PATCH",
+            body: JSONEncoder().encode(CollaborationUpdate(collaborationEnabled: enabled))
+        )
+    }
+
+    func removeCollaborator(stackID: UUID, userID: UUID) async throws {
+        _ = try await client.restData(
+            "stack_collaborators",
+            query: [
+                URLQueryItem(name: "stack_id", value: "eq.\(stackID.uuidString)"),
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString)")
+            ],
+            method: "DELETE"
+        )
+    }
+
+    func leaveStack(stackID: UUID) async throws {
+        let user = try await client.authUser()
+        try await removeCollaborator(stackID: stackID, userID: user.id)
     }
 }
 
@@ -1572,6 +2398,61 @@ struct SupabaseStorageService: StorageService {
 struct SupabaseRealtimeService: RealtimeService {
     func watchStack(id: UUID) async {}
     func stopWatchingStack(id: UUID) async {}
+}
+
+struct SupabaseSafetyService: SafetyService {
+    private let client: SupabaseClient
+
+    init(configuration: SupabaseConfiguration) {
+        client = SupabaseClient(configuration: configuration)
+    }
+
+    func reportStack(id: UUID, reason: String) async throws {
+        struct Report: Encodable {
+            let reporterID: UUID
+            let reportedStackID: UUID
+            let reason: String
+            enum CodingKeys: String, CodingKey {
+                case reporterID = "reporter_id"
+                case reportedStackID = "reported_stack_id"
+                case reason
+            }
+        }
+        let user = try await client.authUser()
+        let data = try JSONEncoder().encode(Report(reporterID: user.id, reportedStackID: id, reason: reason))
+        _ = try await client.restData("content_reports", method: "POST", body: data)
+    }
+
+    func reportProfile(id: UUID, reason: String) async throws {
+        struct Report: Encodable {
+            let reporterID: UUID
+            let reportedProfileID: UUID
+            let reason: String
+            enum CodingKeys: String, CodingKey {
+                case reporterID = "reporter_id"
+                case reportedProfileID = "reported_profile_id"
+                case reason
+            }
+        }
+        let user = try await client.authUser()
+        let data = try JSONEncoder().encode(Report(reporterID: user.id, reportedProfileID: id, reason: reason))
+        _ = try await client.restData("content_reports", method: "POST", body: data)
+    }
+
+    func blockUser(id: UUID) async throws {
+        struct Block: Encodable {
+            let blockerID: UUID
+            let blockedUserID: UUID
+            enum CodingKeys: String, CodingKey {
+                case blockerID = "blocker_id"
+                case blockedUserID = "blocked_user_id"
+            }
+        }
+        let user = try await client.authUser()
+        guard user.id != id else { throw AppError.unavailable("You can't block your own account.") }
+        let data = try JSONEncoder().encode(Block(blockerID: user.id, blockedUserID: id))
+        _ = try await client.restData("user_blocks", method: "POST", body: data)
+    }
 }
 
 private extension String {

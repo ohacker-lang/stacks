@@ -1,6 +1,6 @@
-# Development project only. This identifier is safe to commit; credentials stay
+# Primary Stacks project. This identifier is safe to commit; credentials stay
 # in the Supabase CLI session and Supabase project secrets.
-project_id = "hpjiphvgmhvvvfxkunwb"
+project_id = "iuovmgjcfwgwozfnsdgf"
 
 # Every app-facing function requires an authenticated Supabase user. The only
 # public endpoint is the future read-only web preview, which must still enforce
@@ -32,5 +32,35 @@ verify_jwt = true
 [functions.media-url]
 verify_jwt = true
 
+[functions.claim-gift]
+verify_jwt = true
+
+[functions.update-gift-claim]
+verify_jwt = true
+
+[functions.create-collaboration-invite]
+verify_jwt = true
+
+[functions.accept-collaboration-invite]
+verify_jwt = true
+
+[functions.preview-collaboration-invite]
+verify_jwt = true
+
 [functions.web-preview]
+verify_jwt = false
+
+[functions.sync-pro-entitlement]
+verify_jwt = true
+
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.register-push-token]
+verify_jwt = true
+
+[functions.price-alerts]
+verify_jwt = true
+
+[functions.check-price-alerts]
 verify_jwt = false

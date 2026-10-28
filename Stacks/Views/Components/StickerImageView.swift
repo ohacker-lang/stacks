@@ -57,15 +57,19 @@ struct StickerImageView: View {
                     }
                 }
             }
-        } else if let assetName = DemoProductImageCatalog.assetName(for: item.title) {
+        } else if isDemoItem,
+                  let assetName = DemoProductImageCatalog.assetName(for: item.title),
+                  !requiresCutout || Self.assetHasTransparency(named: assetName) {
             Image(assetName)
                 .resizable()
                 .scaledToFit()
-        } else if !requiresCutout, let imageURL = item.originalImageURL {
+        } else if (!requiresCutout || CuratedStackCatalog.isCuratedStack(item.stackID)),
+                  let imageURL = item.originalImageURL {
             if imageURL.isFileURL, let image = UIImage(contentsOfFile: imageURL.path) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
+                    .blendMode(CuratedStackCatalog.isCuratedStack(item.stackID) ? .multiply : .normal)
             } else {
                 AsyncImage(url: imageURL) { phase in
                     switch phase {
@@ -76,6 +80,7 @@ struct StickerImageView: View {
                         image
                             .resizable()
                             .scaledToFit()
+                            .blendMode(CuratedStackCatalog.isCuratedStack(item.stackID) ? .multiply : .normal)
                     case .failure:
                         fallbackObject
                     @unknown default:
@@ -83,7 +88,7 @@ struct StickerImageView: View {
                     }
                 }
             }
-        } else if !requiresCutout, let imageURL = DemoProductImageCatalog.url(for: item.title) {
+        } else if isDemoItem, !requiresCutout, let imageURL = DemoProductImageCatalog.url(for: item.title) {
             AsyncImage(url: imageURL) { phase in
                 switch phase {
                 case .success(let image):
@@ -99,6 +104,25 @@ struct StickerImageView: View {
                     fallbackObject
                 }
             }
+        } else if CuratedStackCatalog.isCuratedStack(item.stackID) {
+            VStack(spacing: 5) {
+                Text(item.brand)
+                    .font(.system(size: max(11, size * 0.13), weight: .semibold))
+                    .lineLimit(2)
+                Text(item.title)
+                    .font(.system(size: max(9, size * 0.085)))
+                    .lineLimit(3)
+            }
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Color.stacksInk)
+            .padding(10)
+            .frame(width: size, height: size)
+            .background(Color.stacksCream, in: RoundedRectangle(cornerRadius: 16))
+        } else if let demoGlyph = item.demoGlyph {
+            Image(systemName: demoGlyph)
+                .font(.system(size: size * 0.42, weight: .semibold))
+                .foregroundStyle(Color.stacksInk.opacity(0.72))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             fallbackObject
         }
@@ -111,10 +135,32 @@ struct StickerImageView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var isDemoItem: Bool {
+        item.sourceURL.host?.lowercased() == "example.com"
+    }
+
     private var stickerHalo: some View {
         RoundedRectangle(cornerRadius: 30, style: .continuous)
             .fill(.white.opacity(item.removalStatus.isWorking ? 0.82 : 0.01))
             .blur(radius: item.removalStatus.isWorking ? 4 : 0)
+    }
+
+    /// A bundled PNG is only a collage sticker when it actually contains
+    /// transparency. This keeps an accidental white or checkerboard source
+    /// image from looking like a cutout before background removal finishes.
+    private static func assetHasTransparency(named name: String) -> Bool {
+        guard let image = UIImage(named: name), let cgImage = image.cgImage else {
+            return false
+        }
+
+        switch cgImage.alphaInfo {
+        case .alphaOnly, .first, .last, .premultipliedFirst, .premultipliedLast:
+            return true
+        case .none, .noneSkipFirst, .noneSkipLast:
+            return false
+        @unknown default:
+            return false
+        }
     }
 }
 
@@ -125,6 +171,38 @@ enum DemoProductImageCatalog {
         // The mock Stack intentionally uses the bundled transparent cutouts so
         // it reads like a real collection even when the app is offline.
         let curatedMockAssets: [String: String] = [
+            "navy adidas shorts": "OnboardingAdidasShorts",
+            "cobalt windbreaker": "OnboardingBlueWindbreaker",
+            "canvas weekender": "OnboardingDuffelBag",
+            "pearl drop earrings": "OnboardingEarrings",
+            "film crew cap": "OnboardingFilmCrewCap",
+            "wrapped gift": "OnboardingGiftBox",
+            "forest green tee": "OnboardingGreenTee",
+            "everyday keyring": "OnboardingKeys",
+            "aqua mushroom lamp": "OnboardingLampAquaMushroom",
+            "black ribbed lamp": "OnboardingLampBlackRibbed",
+            "blue orb lamp": "OnboardingLampBlueOrb",
+            "burgundy shade lamp": "OnboardingLampBurgundyShade",
+            "green dome lamp": "OnboardingLampGreenDome",
+            "tall green lamp": "OnboardingLampGreenTall",
+            "navy dome lamp": "OnboardingLampNavyDome",
+            "orange mushroom lamp": "OnboardingLampOrangeMushroom",
+            "pleated blue lamp": "OnboardingLampPleatedBlue",
+            "red mushroom lamp": "OnboardingLampRedMushroom",
+            "red shade lamp": "OnboardingLampRedShade",
+            "yellow stem lamp": "OnboardingLampYellowStem",
+            "memorial graphic tee": "OnboardingMemorialShirt",
+            "navy script cap": "OnboardingNavyCap",
+            "ramblin cord cap": "OnboardingRamblinCap",
+            "boston red cap": "OnboardingRedBosHat",
+            "black samba sneakers": "OnboardingSambaShoe",
+            "gingham boxer shorts": "OnboardingShorts",
+            "studio sneakers": "OnboardingSneaker",
+            "essential white tee": "OnboardingTShirt",
+            "illustrated canvas tote": "OnboardingTote",
+            "leather zip wallet": "OnboardingWallet",
+            "vintage gold watch": "OnboardingWatch",
+            "weekend red wine": "OnboardingWine",
             "graphic t-shirt": "OnboardingTShirt",
             "gallery tee": "OnboardingWallet",
             "denim shorts": "OnboardingShorts",

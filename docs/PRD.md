@@ -30,7 +30,7 @@ Stacks makes the saved object the center of the experience: a product is easy to
 
 1. Let a user save a product from a URL, a search, a camera capture, a photo, or the iOS Share Sheet in under one minute.
 2. Convert saved product imagery into a clean transparent cutout whenever possible.
-3. Let users organize products into highly visual Stacks with a clear title and optional editorial description.
+3. Let users organize products into highly visual Stacks with a clear title.
 4. Preserve a reliable source/buy link for every saved product.
 5. Make a Stack attractive enough to share as a personal collection or wishlist.
 6. Establish a simple social loop: discover creators, follow them, and pin their Stacks.
@@ -75,13 +75,12 @@ Shares visual edits such as “Summer,” “Apartment Objects,” or “Gifts U
 A named collection of products. A Stack has:
 
 - Title (required)
-- Short editorial description (optional)
 - Owner and visibility
 - Optional wishlist mode
 - Ordered product items
 - Optional collaborators in later V1 work
 
-The Stack detail screen is a pure-white editorial canvas. It has a large SF Pro Display-style title, a centered Instrument Serif description, a back control, and an owner-only add control. Products appear as background-removed cutouts in an intentional, scrollable four-column composition.
+The Stack detail screen is a pure-white editorial canvas. It has a large SF Pro Display-style title, a back control, and an owner-only add control. Products appear as background-removed cutouts in an intentional, scrollable composition.
 
 ### Stack Item
 

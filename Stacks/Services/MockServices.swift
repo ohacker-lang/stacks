@@ -25,6 +25,12 @@ actor MockAuthService: AuthService {
         return session
     }
 
+    func signInWithGoogle() async throws -> AuthSession {
+        // Keep local builds and previews on the same onboarding path as the
+        // production OAuth flow without opening an external browser.
+        try await signInWithApple()
+    }
+
     func signInWithEmail(_ email: String) async throws -> EmailAuthenticationResult {
         guard email.contains("@"), email.contains(".") else {
             throw AppError.invalidEmail
@@ -44,6 +50,10 @@ actor MockAuthService: AuthService {
         // The mock sign-in never opens an external browser, but keeping this
         // route lets the app exercise the same callback plumbing as Supabase.
         session
+    }
+
+    func recordLegalAcceptance(for userID: UUID, version: String) async throws {
+        guard session?.userID == userID, !version.isEmpty else { throw AppError.notFound }
     }
 
     func completeOnboarding(for userID: UUID) async throws {
@@ -78,12 +88,42 @@ actor MockStackRepository: StackRepository {
 
     func fetchMyStacks(for userID: UUID) async throws -> [Stack] {
         try await Task.sleep(for: .milliseconds(250))
-        return myStacks.filter { $0.ownerID == userID }
+        return myStacks.filter {
+            $0.ownerID == userID || $0.collaborators.contains(where: { $0.user.id == userID })
+        }
+    }
+
+    func fetchOwnedStackDestinations(for user: UserProfile) async throws -> [SharedStackDestination] {
+        myStacks.filter { $0.ownerID == user.id }
+            .sorted { $0.updatedAt > $1.updatedAt }
+            .map {
+                SharedStackDestination(
+                    id: $0.id,
+                    title: $0.displayTitle,
+                    ownerName: user.displayName,
+                    avatarURL: user.avatarURL,
+                    updatedAt: $0.updatedAt
+                )
+            }
+    }
+
+    func fetchStack(id: UUID, for userID: UUID) async throws -> Stack {
+        guard let stack = (myStacks + discoverStacks).first(where: { $0.id == id }),
+              stack.ownerID == userID || stack.visibility == .publicDiscover || stack.visibility == .publicLink
+                || stack.collaborators.contains(where: { $0.user.id == userID }) else {
+            throw AppError.notFound
+        }
+        return stack
     }
 
     func fetchDiscoverStacks(query: String?) async throws -> [Stack] {
         try await Task.sleep(for: .milliseconds(250))
-        let stacks = discoverStacks
+        let stacks = discoverStacks.sorted {
+            if $0.isFollowingAuthor != $1.isFollowingAuthor {
+                return $0.isFollowingAuthor
+            }
+            return $0.updatedAt > $1.updatedAt
+        }
         guard let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return stacks
         }
@@ -94,7 +134,7 @@ actor MockStackRepository: StackRepository {
         }
     }
 
-    func createStack(title: String, wishlistMode: Bool, owner: UserProfile) async throws -> Stack {
+    func createStack(title: String, wishlistMode: Bool, visibility: StackVisibility, owner: UserProfile) async throws -> Stack {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanTitle.isEmpty else {
             throw AppError.missingRequiredField("Title")
@@ -104,17 +144,26 @@ actor MockStackRepository: StackRepository {
             ownerID: owner.id,
             author: owner,
             title: cleanTitle,
-            summary: "A new canvas for things you love.",
-            visibility: .private,
+            visibility: visibility,
             wishlistMode: wishlistMode,
             collaborators: [],
             items: [],
+            publicLinkToken: visibility == .publicLink ? UUID() : nil,
             createdAt: Date(),
             updatedAt: Date(),
             isBookmarked: false,
             isFollowingAuthor: false
         )
         myStacks.insert(stack, at: 0)
+        return stack
+    }
+
+    func fetchSharedStack(token: UUID) async throws -> Stack {
+        guard let stack = (myStacks + discoverStacks).first(where: {
+            $0.visibility == .publicLink && $0.publicLinkToken == token
+        }) else {
+            throw AppError.notFound
+        }
         return stack
     }
 
@@ -146,7 +195,6 @@ actor MockStackRepository: StackRepository {
             ownerID: owner.id,
             author: owner,
             title: stack.title,
-            summary: stack.summary,
             visibility: .private,
             wishlistMode: stack.wishlistMode,
             collaborators: [],
@@ -158,6 +206,33 @@ actor MockStackRepository: StackRepository {
         )
         myStacks.insert(copy, at: 0)
         return copy
+    }
+
+    func updateStack(_ stack: Stack) async throws -> Stack {
+        guard let index = myStacks.firstIndex(where: { $0.id == stack.id }) else {
+            throw AppError.notFound
+        }
+        var updated = stack
+        updated.updatedAt = Date()
+        myStacks[index] = updated
+        return updated
+    }
+
+    func rotateWishlistLink(stackID: UUID, revoke: Bool) async throws -> Stack {
+        guard let index = myStacks.firstIndex(where: { $0.id == stackID }), myStacks[index].wishlistMode else {
+            throw AppError.notFound
+        }
+        myStacks[index].publicLinkToken = UUID()
+        myStacks[index].visibility = revoke ? .private : .publicLink
+        myStacks[index].updatedAt = Date()
+        return myStacks[index]
+    }
+
+    func deleteStack(id: UUID) async throws {
+        guard let index = myStacks.firstIndex(where: { $0.id == id }) else {
+            throw AppError.notFound
+        }
+        myStacks.remove(at: index)
     }
 
     func addItem(_ item: StackItem, to stackID: UUID) async throws -> Stack {
@@ -219,21 +294,38 @@ actor MockStackRepository: StackRepository {
             myStacks[index].isFollowingAuthor.toggle()
             myStacks[index].author.isFollowing = myStacks[index].isFollowingAuthor
         }
-        return discoverStacks
+        return discoverStacks.sorted {
+            if $0.isFollowingAuthor != $1.isFollowingAuthor {
+                return $0.isFollowingAuthor
+            }
+            return $0.updatedAt > $1.updatedAt
+        }
     }
 }
 
 actor MockProfileRepository: ProfileRepository {
     private let seed: MockSeedData
+    private var currentProfile: UserProfile
 
     init(seed: MockSeedData) {
         self.seed = seed
+        currentProfile = seed.currentUser
     }
 
     func currentProfile(for session: AuthSession) async throws -> UserProfile {
         try await Task.sleep(for: .milliseconds(150))
-        return seed.currentUser
+        return currentProfile
     }
+
+    func updateProfile(_ profile: UserProfile, avatarData: Data?) async throws -> UserProfile {
+        guard profile.id == currentProfile.id else { throw AppError.notFound }
+        currentProfile = profile
+        return profile
+    }
+
+    func enableProfileSharing() async throws {}
+
+    func disableProfileSharing() async throws {}
 
     func suggestedCreators() async throws -> [UserProfile] {
         try await Task.sleep(for: .milliseconds(150))
@@ -249,6 +341,16 @@ actor MockProfileRepository: ProfileRepository {
                 isFollowing: false
             )
         ]
+    }
+
+    func searchCreators(query: String) async throws -> [UserProfile] {
+        let creators = try await suggestedCreators()
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else { return creators }
+        return creators.filter {
+            $0.displayName.localizedCaseInsensitiveContains(cleanQuery)
+                || $0.username.localizedCaseInsensitiveContains(cleanQuery)
+        }
     }
 }
 
@@ -324,13 +426,20 @@ actor MockBackgroundRemovalService: BackgroundRemovalService {
 }
 
 actor MockAffiliateService: AffiliateService {
-    func affiliateURL(for url: URL) async throws -> URL {
-        URL(string: "https://go.example.com?url=\(url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") ?? url
+    func resolveLink(for url: URL, countryCode: String?) async throws -> AffiliateLinkResolution {
+        AffiliateLinkResolution(url: url, isCommissionable: false)
     }
 }
 
+actor MockSafetyService: SafetyService {
+    func reportStack(id: UUID, reason: String) async throws {}
+    func reportProfile(id: UUID, reason: String) async throws {}
+    func blockUser(id: UUID) async throws {}
+}
+
 actor MockClaimService: ClaimService {
-    func claim(item: StackItem, claimerName: String) async throws -> GiftClaim {
+    func myClaimStatus(for item: StackItem) async throws -> GiftClaimStatus? { nil }
+    func claim(item: StackItem, in stack: Stack, claimerName: String) async throws -> GiftClaim {
         GiftClaim(
             id: UUID(),
             itemID: item.id,
@@ -341,24 +450,52 @@ actor MockClaimService: ClaimService {
             createdAt: Date()
         )
     }
+
+    func updateStatus(for item: StackItem, in stack: Stack, status: GiftClaimStatus?) async throws -> GiftClaimStatus? {
+        status
+    }
 }
 
 actor MockCollaborationService: CollaborationService {
     private let seed: MockSeedData
+    private var invites: [UUID: CollaborationInvitePreview] = [:]
 
     init(seed: MockSeedData) {
         self.seed = seed
     }
 
-    func invite(email: String, to stack: Stack) async throws -> Collaborator {
-        guard email.contains("@") else { throw AppError.invalidEmail }
-        return Collaborator(
+    func createInvite(to stack: Stack, permission: CollaboratorPermission) async throws -> CollaborationInvite {
+        let invite = CollaborationInvite(
             id: UUID(),
-            user: seed.isabella,
-            permission: .edit,
-            invitedAt: Date()
+            stackID: stack.id,
+            token: UUID(),
+            permission: permission,
+            expiresAt: Calendar.current.date(byAdding: .day, value: 7, to: Date())!
         )
+        invites[invite.token] = CollaborationInvitePreview(
+            token: invite.token,
+            stackID: stack.id,
+            stackTitle: stack.displayTitle,
+            owner: stack.author,
+            permission: permission,
+            expiresAt: invite.expiresAt
+        )
+        return invite
     }
+
+    func previewInvite(token: UUID) async throws -> CollaborationInvitePreview {
+        guard let preview = invites[token] else { throw AppError.notFound }
+        return preview
+    }
+
+    func acceptInvite(token: UUID) async throws -> UUID {
+        guard let preview = invites.removeValue(forKey: token) else { throw AppError.notFound }
+        return preview.stackID
+    }
+
+    func setCollaborationEnabled(stackID: UUID, enabled: Bool) async throws {}
+    func removeCollaborator(stackID: UUID, userID: UUID) async throws {}
+    func leaveStack(stackID: UUID) async throws {}
 }
 
 actor MockStorageService: StorageService {

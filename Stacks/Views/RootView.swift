@@ -9,7 +9,9 @@ struct RootView: View {
     var body: some View {
         Group {
 #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-preview-product") {
+            if ProcessInfo.processInfo.arguments.contains("-preview-save-anywhere") {
+                OnboardingView()
+            } else if ProcessInfo.processInfo.arguments.contains("-preview-product") {
                 NavigationStack {
                     ProductDetailView(
                         item: stackTitlePreview.items[0],
@@ -34,14 +36,14 @@ struct RootView: View {
         }
         .task {
 #if DEBUG
-            guard !ProcessInfo.processInfo.arguments.contains("-preview-stack"),
+            guard !ProcessInfo.processInfo.arguments.contains("-preview-save-anywhere"),
+                  !ProcessInfo.processInfo.arguments.contains("-preview-stack"),
                   !ProcessInfo.processInfo.arguments.contains("-preview-product") else { return }
 #endif
             if session.state == .launching {
                 await session.restore()
             }
         }
-        .dismissKeyboardOnTap()
     }
 
 #if DEBUG
@@ -62,6 +64,7 @@ struct RootView: View {
                 OnboardingView()
             case .signedIn:
                 AppShellView()
+                    .dismissKeyboardOnTap()
             }
         }
     }
@@ -90,6 +93,24 @@ private extension View {
 
 private struct LaunchView: View {
     var body: some View {
-        Color.white.ignoresSafeArea()
+        ZStack {
+            Color.white.ignoresSafeArea()
+
+            VStack(spacing: 18) {
+                Text("Stacks")
+                    .font(.stacksHeader(size: 54))
+                    .tracking(-1.5)
+                    .foregroundStyle(Color.stacksInk)
+
+                ProgressView()
+                    .tint(Color.stacksInk)
+
+                Text("Getting things ready…")
+                    .font(.stacksText(size: 14, weight: .regular))
+                    .foregroundStyle(Color.stacksMutedInk)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Stacks is loading")
+        }
     }
 }

@@ -39,6 +39,10 @@ struct EmailSignInSheet: View {
                 Color.clear
                     .frame(width: 36, height: 36)
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isEmailFocused = false
+            }
 
             HStack(spacing: 10) {
                 TextField("Email", text: $email)
@@ -83,6 +87,9 @@ struct EmailSignInSheet: View {
                 .font(.stacksText(size: 13, weight: .regular))
                 .foregroundStyle(Color.stacksMutedInk)
                 .padding(.top, 12)
+                .onTapGesture {
+                    isEmailFocused = false
+                }
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -92,8 +99,17 @@ struct EmailSignInSheet: View {
             }
         }
         .onDisappear {
+            isEmailFocused = false
             guard !didFinish else { return }
             onCancel()
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    isEmailFocused = false
+                }
+            }
         }
     }
 

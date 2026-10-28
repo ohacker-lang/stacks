@@ -28,9 +28,16 @@ serve(async (req) => {
   try {
     // Media storage does not cascade with database rows, so clear the private
     // user prefix before deleting the auth account and its cascaded profile.
-    await removeUserMedia(admin, user.id);
+    // Swift's UUID.uuidString uses uppercase hex, while Supabase Auth returns
+    // lowercase UUIDs. Existing uploads therefore live under uppercase paths.
+    const userPrefixes = [...new Set([user.id.toUpperCase(), user.id.toLowerCase()])];
+    for (const prefix of userPrefixes) {
+      await removeUserMedia(admin, prefix, "stack-media");
+      await removeUserMedia(admin, prefix, "profile-media");
+    }
 
-    const { error } = await admin.auth.admin.deleteUser(user.id, true);
+    // Soft deletion retains the auth row and does not run profile cascades.
+    const { error } = await admin.auth.admin.deleteUser(user.id);
     if (error) throw error;
 
     return jsonResponse({ deleted: true });
@@ -40,24 +47,36 @@ serve(async (req) => {
   }
 });
 
-async function removeUserMedia(admin: ReturnType<typeof createClient>, userID: string) {
-  // Query the object table through the service-role client instead of using
-  // Storage.list. list() is directory-scoped and would leave deeper paths
-  // such as <user-id>/imports/originals/... behind.
-  while (true) {
-    const { data: objects, error } = await admin
-      .schema("storage")
-      .from("objects")
-      .select("name")
-      .eq("bucket_id", "stack-media")
-      .like("name", `${userID}/%`)
-      .limit(1_000);
-    if (error) throw error;
-
-    const paths = (objects ?? []).map((object) => object.name as string);
-    if (paths.length === 0) return;
-
-    const { error: removeError } = await admin.storage.from("stack-media").remove(paths);
-    if (removeError) throw removeError;
+async function removeUserMedia(
+  admin: ReturnType<typeof createClient>,
+  userID: string,
+  bucket: string,
+) {
+  // Storage.list is folder-scoped. Traverse every nested folder under the
+  // user's namespace, and delete through the Storage API so file bytes and
+  // metadata are both removed. PostgREST does not normally expose `storage`.
+  async function removeFolder(path: string): Promise<void> {
+    const files: string[] = [];
+    const folders: string[] = [];
+    for (let offset = 0; ; offset += 1_000) {
+      const { data: entries, error } = await admin.storage.from(bucket).list(path, {
+        limit: 1_000,
+        offset,
+      });
+      if (error) throw error;
+      if (!entries?.length) break;
+      for (const entry of entries) {
+        const child = `${path}/${entry.name}`;
+        if (entry.id === null) folders.push(child);
+        else files.push(child);
+      }
+      if (entries.length < 1_000) break;
+    }
+    for (const folder of folders) await removeFolder(folder);
+    for (let index = 0; index < files.length; index += 1_000) {
+      const { error } = await admin.storage.from(bucket).remove(files.slice(index, index + 1_000));
+      if (error) throw error;
+    }
   }
+  await removeFolder(userID);
 }

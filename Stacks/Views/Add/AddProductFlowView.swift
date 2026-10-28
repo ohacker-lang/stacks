@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Observation
 import PhotosUI
 import SwiftUI
@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 final class AddProductFlowViewModel {
     enum Stage: Equatable {
         case sourcePicker
-        case camera
+        case barcode
         case photoLibrary
         case linkImport
         case processing
@@ -19,18 +19,19 @@ final class AddProductFlowViewModel {
         case complete
     }
 
-    var stage: Stage = .camera
+    var stage: Stage = .barcode
     var capturedImageData: Data?
 }
 
 struct AddProductFlowView: View {
     @State private var viewModel = AddProductFlowViewModel()
-    @State private var isShowingCamera = false
+    @State private var isShowingBarcodeScanner = false
     @State private var isShowingPhotoLibrary = false
     @State private var isShowingFallback = false
     @State private var isShowingPhotoReview = false
     @State private var isShowingLinkImport = false
-    @State private var cameraExit: CameraExit?
+    @State private var scannerExit: ScannerExit?
+    @State private var barcodePreview: ProductLinkPreview?
 
     let user: UserProfile
     let onComplete: (Stack) -> Void
@@ -40,23 +41,23 @@ struct AddProductFlowView: View {
         ZStack {
             Color.clear.ignoresSafeArea()
 
-            if isShowingCamera {
-                ProductCameraCaptureView(
-                    onCapture: { data in
-                        viewModel.capturedImageData = data
-                        viewModel.stage = .processing
-                        closeCamera(with: .photoReview)
+            if isShowingBarcodeScanner {
+                BarcodeProductScannerView(
+                    onProduct: { preview in
+                        barcodePreview = preview
+                        viewModel.stage = .linkImport
+                        closeScanner(with: .linkImport)
                     },
                     onPasteLink: {
                         viewModel.stage = .linkImport
-                        closeCamera(with: .linkImport)
+                        closeScanner(with: .linkImport)
                     },
                     onChooseFromLibrary: {
                         viewModel.stage = .photoLibrary
-                        closeCamera(with: .photoLibrary)
+                        closeScanner(with: .photoLibrary)
                     },
                     onCancel: {
-                        closeCamera(with: .cancel)
+                        closeScanner(with: .cancel)
                     }
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -64,18 +65,18 @@ struct AddProductFlowView: View {
             }
         }
         .task {
-            openCamera()
+            openBarcodeScanner()
         }
         .fullScreenCover(isPresented: $isShowingPhotoLibrary, onDismiss: continueAfterPhotoLibraryDismissal) {
             ProductPhotoLibraryPicker(
                 onCapture: { data in
                     viewModel.capturedImageData = data
                     viewModel.stage = .editing
-                    cameraExit = .photoReview
+                scannerExit = .photoReview
                     isShowingPhotoLibrary = false
                 },
                 onCancel: {
-                    cameraExit = .camera
+                scannerExit = .barcode
                     isShowingPhotoLibrary = false
                 }
             )
@@ -111,14 +112,14 @@ struct AddProductFlowView: View {
             }
         }
         .fullScreenCover(isPresented: $isShowingLinkImport, onDismiss: dismissIfUnfinished) {
-            ProductLinkImportSheet(user: user) { stack in
+            ProductLinkImportSheet(initialPreview: barcodePreview, user: user) { stack in
                 viewModel.stage = .complete
                 onComplete(stack)
             }
         }
     }
 
-    private func openCamera() {
+    private func openBarcodeScanner() {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
             viewModel.stage = .sourcePicker
             isShowingFallback = true
@@ -127,12 +128,12 @@ struct AddProductFlowView: View {
 
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            isShowingCamera = true
+            isShowingBarcodeScanner = true
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
                     if granted {
-                        isShowingCamera = true
+                        isShowingBarcodeScanner = true
                     } else {
                         viewModel.stage = .sourcePicker
                         isShowingFallback = true
@@ -148,8 +149,8 @@ struct AddProductFlowView: View {
         }
     }
 
-    private func continueAfterCameraDismissal() {
-        switch cameraExit {
+    private func continueAfterScannerDismissal() {
+        switch scannerExit {
         case .photoReview:
             viewModel.stage = .editing
             isShowingPhotoReview = true
@@ -157,36 +158,36 @@ struct AddProductFlowView: View {
             isShowingLinkImport = true
         case .photoLibrary:
             isShowingPhotoLibrary = true
-        case .camera:
-            openCamera()
+        case .barcode:
+            openBarcodeScanner()
         case .cancel, nil:
             onCancel()
         }
-        cameraExit = nil
+        scannerExit = nil
     }
 
-    private func closeCamera(with exit: CameraExit) {
-        cameraExit = exit
+    private func closeScanner(with exit: ScannerExit) {
+        scannerExit = exit
         withAnimation(.easeInOut(duration: 0.2)) {
-            isShowingCamera = false
+            isShowingBarcodeScanner = false
         }
         DispatchQueue.main.async {
-            continueAfterCameraDismissal()
+            continueAfterScannerDismissal()
         }
     }
 
     private func continueAfterPhotoLibraryDismissal() {
-        switch cameraExit {
+        switch scannerExit {
         case .photoReview:
             isShowingPhotoReview = true
-        case .camera:
-            openCamera()
+        case .barcode:
+            openBarcodeScanner()
         case .linkImport:
             isShowingLinkImport = true
         case .photoLibrary, .cancel, nil:
             onCancel()
         }
-        cameraExit = nil
+        scannerExit = nil
     }
 
     private func dismissIfUnfinished() {
@@ -195,11 +196,11 @@ struct AddProductFlowView: View {
     }
 }
 
-private enum CameraExit {
+private enum ScannerExit {
     case photoReview
     case linkImport
     case photoLibrary
-    case camera
+    case barcode
     case cancel
 }
 
@@ -379,6 +380,276 @@ struct ProductCameraCaptureView: View {
         }
     }
 
+}
+
+struct BarcodeProductScannerView: View {
+    @State private var scanner = BarcodeCameraController()
+    @State private var isLookingUp = false
+    @State private var errorMessage: String?
+    @State private var manualCode = ""
+    @State private var isShowingMoreWaysHint = false
+
+    var showsMoreWaysHint = false
+    let onProduct: (ProductLinkPreview) -> Void
+    let onPasteLink: () -> Void
+    let onChooseFromLibrary: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = min(proxy.size.width - 30, 410)
+            let height = min(max(width * 1.28, 455), proxy.size.height - 72)
+
+            ZStack {
+                Color.black.opacity(0.07).ignoresSafeArea()
+
+                ZStack {
+                    BarcodeCameraPreview(session: scanner.session)
+
+                    LinearGradient(
+                        colors: [.black.opacity(0.42), .clear, .black.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+
+                    VStack(spacing: 0) {
+                        HStack {
+                            CameraCardIconButton(systemImage: "xmark", accessibilityLabel: "Cancel", action: onCancel)
+                            Spacer()
+                            Menu {
+                                Button("Paste product link", systemImage: "link", action: onPasteLink)
+                                Button("Choose from Photos", systemImage: "photo.on.rectangle", action: onChooseFromLibrary)
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 46, height: 46)
+                                    .background(.ultraThinMaterial, in: Circle())
+                                    .overlay { Circle().stroke(.white.opacity(0.22), lineWidth: 1) }
+                            }
+                            .accessibilityLabel("Other ways to add")
+                            .overlay(alignment: .topTrailing) {
+                                if isShowingMoreWaysHint {
+                                    HStack(spacing: 7) {
+                                        Text("More ways to add")
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Image(systemName: "arrow.up.right")
+                                            .font(.system(size: 13, weight: .bold))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 13)
+                                    .frame(height: 38)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay { Capsule().stroke(.white.opacity(0.24), lineWidth: 1) }
+                                    .fixedSize()
+                                    .offset(y: 54)
+                                    .transition(.move(edge: .top).combined(with: .opacity))
+                                    .allowsHitTesting(false)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 17)
+                        .padding(.top, 18)
+
+                        Spacer()
+
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(.white.opacity(0.95), lineWidth: 2)
+                            .frame(width: width * 0.72, height: width * 0.44)
+                            .overlay(alignment: .topLeading) {
+                                ScanCorner()
+                                    .offset(x: -2, y: -2)
+                            }
+                            .overlay(alignment: .topTrailing) {
+                                ScanCorner()
+                                    .rotationEffect(.degrees(90))
+                                    .offset(x: 2, y: -2)
+                            }
+                            .overlay(alignment: .bottomLeading) {
+                                ScanCorner()
+                                    .rotationEffect(.degrees(-90))
+                                    .offset(x: -2, y: 2)
+                            }
+                            .overlay(alignment: .bottomTrailing) {
+                                ScanCorner()
+                                    .rotationEffect(.degrees(180))
+                                    .offset(x: 2, y: 2)
+                            }
+
+                        Spacer()
+
+                        Text(isLookingUp ? "Finding product…" : "Scan a product barcode")
+                            .font(.system(size: 19, weight: .semibold, design: .default))
+                            .foregroundStyle(.white)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 24)
+                    }
+
+                    if isLookingUp {
+                        Color.black.opacity(0.28)
+                        ProgressView().tint(.white).scaleEffect(1.2)
+                    }
+                }
+                .frame(width: width, height: height)
+                .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 38, style: .continuous).stroke(Color.white.opacity(0.62), lineWidth: 1) }
+                .shadow(color: .black.opacity(0.28), radius: 30, x: 0, y: 16)
+                .position(x: proxy.size.width / 2, y: proxy.size.height - (height / 2) - max(2, proxy.safeAreaInsets.bottom - 14))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .task {
+            if showsMoreWaysHint {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.82).delay(0.45)) {
+                    isShowingMoreWaysHint = true
+                }
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.22)) {
+                    isShowingMoreWaysHint = false
+                }
+            }
+            scanner.start(
+                onCode: { code in resolve(code) },
+                onUnavailable: { errorMessage = "Barcode scanning is unavailable on this device. You can paste a product link instead." }
+            )
+        }
+        .onDisappear { scanner.stop() }
+        .alert("Couldn’t find this product", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("Paste Link", action: onPasteLink)
+            Button("Scan Again") { scanner.resumeScanning() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func resolve(_ code: String) {
+        guard !isLookingUp else { return }
+        isLookingUp = true
+        scanner.stop()
+        Task {
+            do {
+                let preview = try await ProductBarcodeLookupService.lookup(code)
+                await MainActor.run { onProduct(preview) }
+            } catch {
+                await MainActor.run {
+                    isLookingUp = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+private struct ScanCorner: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 0, y: 22))
+            path.addLine(to: .zero)
+            path.addLine(to: CGPoint(x: 22, y: 0))
+        }
+        .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+        .frame(width: 24, height: 24)
+    }
+}
+
+private struct BarcodeCameraPreview: UIViewRepresentable {
+    let session: AVCaptureSession
+
+    func makeUIView(context: Context) -> InlineCameraPreviewView {
+        let view = InlineCameraPreviewView()
+        view.previewLayer.session = session
+        return view
+    }
+
+    func updateUIView(_ uiView: InlineCameraPreviewView, context: Context) {
+        uiView.previewLayer.session = session
+    }
+}
+
+private final class BarcodeCameraController: NSObject, AVCaptureMetadataOutputObjectsDelegate, @unchecked Sendable {
+    let session = AVCaptureSession()
+    private let queue = DispatchQueue(label: "com.stacks.barcode-camera")
+    private let metadataOutput = AVCaptureMetadataOutput()
+    private var isConfigured = false
+    private var didDeliverCode = false
+    private var codeHandler: ((String) -> Void)?
+    private var unavailableHandler: (() -> Void)?
+
+    func start(onCode: @escaping (String) -> Void, onUnavailable: @escaping () -> Void) {
+        codeHandler = onCode
+        unavailableHandler = onUnavailable
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            startSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                granted ? self?.startSession() : self?.reportUnavailable()
+            }
+        case .denied, .restricted:
+            reportUnavailable()
+        @unknown default:
+            reportUnavailable()
+        }
+    }
+
+    func stop() {
+        queue.async { [session] in
+            guard session.isRunning else { return }
+            session.stopRunning()
+        }
+    }
+
+    func resumeScanning() {
+        didDeliverCode = false
+        startSession()
+    }
+
+    private func startSession() {
+        queue.async { [weak self] in
+            guard let self, self.configureSessionIfNeeded() else {
+                self?.reportUnavailable()
+                return
+            }
+            guard !self.session.isRunning else { return }
+            self.session.startRunning()
+        }
+    }
+
+    private func configureSessionIfNeeded() -> Bool {
+        guard !isConfigured else { return true }
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        session.sessionPreset = .high
+
+        guard let device = AVCaptureDevice.default(for: .video),
+              let input = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(input),
+              session.canAddOutput(metadataOutput) else {
+            return false
+        }
+        session.addInput(input)
+        session.addOutput(metadataOutput)
+        metadataOutput.setMetadataObjectsDelegate(self, queue: .main)
+        metadataOutput.metadataObjectTypes = [.ean8, .ean13, .upce, .code128, .code39, .code93, .itf14, .qr]
+        isConfigured = true
+        return true
+    }
+
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        guard !didDeliverCode,
+              let value = metadataObjects.compactMap({ $0 as? AVMetadataMachineReadableCodeObject }).compactMap(\.stringValue).first else {
+            return
+        }
+        didDeliverCode = true
+        codeHandler?(value)
+    }
+
+    private func reportUnavailable() {
+        DispatchQueue.main.async { [unavailableHandler] in unavailableHandler?() }
+    }
 }
 
 private struct CameraCardIconButton: View {

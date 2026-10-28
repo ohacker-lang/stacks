@@ -6,37 +6,56 @@ struct AddItemOptionsSheet: View {
     let onSelect: (AddItemSource) -> Void
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("Add item to Stack") {
-                    Button {
-                        onSelect(.search)
-                    } label: {
-                        Label("Search", systemImage: "magnifyingglass")
-                    }
+        VStack(spacing: 8) {
+            Text("Add to the stack")
+                .font(.stacksText(size: 19, weight: .semibold))
+                .foregroundStyle(Color.stacksInk)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 4)
 
-                    Button {
-                        onSelect(.pastedLink)
-                    } label: {
-                        Label("Paste Link", systemImage: "link")
-                    }
-
-                    Button {
-                        onSelect(.camera)
-                    } label: {
-                        Label("Take Picture", systemImage: "camera")
-                    }
-
-                    Button {
-                        onSelect(.photoLibrary)
-                    } label: {
-                        Label("Camera Roll", systemImage: "photo.on.rectangle")
-                    }
-                }
-            }
-            .navigationTitle("Add Item")
-            .navigationBarTitleDisplayMode(.inline)
+            actionRow("Paste Link", systemImage: "link", source: .pastedLink)
+            Divider().overlay(Color.stacksInk.opacity(0.10)).padding(.leading, 46)
+            actionRow("Scan Barcode", systemImage: "barcode.viewfinder", source: .camera)
+            Divider().overlay(Color.stacksInk.opacity(0.10)).padding(.leading, 46)
+            actionRow("Camera Roll", systemImage: "photo.on.rectangle", source: .photoLibrary)
         }
+        .padding(.horizontal, 22)
+        .padding(.top, 12)
+        .padding(.bottom, 18)
+        .frame(maxWidth: .infinity)
+        .background(Color.stacksInk.opacity(0.045), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .stacksGlass(cornerRadius: 30)
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.62), lineWidth: 1)
+        }
+    }
+
+    private func actionRow(_ title: String, systemImage: String, source: AddItemSource) -> some View {
+        Button {
+            onSelect(source)
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color.stacksInk)
+                    .frame(width: 30, height: 36)
+
+                Text(title)
+                    .font(.stacksText(size: 16, weight: .medium))
+                    .foregroundStyle(Color.stacksInk)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.stacksMutedInk.opacity(0.7))
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 46)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -155,6 +174,15 @@ private struct MinimalLinkPasteStage: View {
     let onCancel: () -> Void
 
     @FocusState private var isFocused: Bool
+    @State private var loadingMessage = Self.loadingMessages[0]
+
+    private static let loadingMessages = [
+        "Stacking the universe",
+        "Making cool stuff happen",
+        "Chasing down the good stuff",
+        "Putting the pieces together",
+        "Finding its best angle"
+    ]
 
     private var hasLink: Bool {
         !link.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -171,96 +199,108 @@ private struct MinimalLinkPasteStage: View {
                 Button("Cancel", action: onCancel)
                     .font(.stacksText(size: 16, weight: .regular))
                     .foregroundStyle(Color.stacksMutedInk)
-
                 Spacer()
             }
             .padding(.horizontal, 28)
             .padding(.top, 16)
 
-            Spacer(minLength: 20)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "link")
+                            .font(.system(size: 24, weight: .regular))
+                            .foregroundStyle(Color.stacksInk)
 
-            VStack(spacing: 12) {
-                Image(systemName: "link")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(Color.stacksInk)
+                        Text("Paste your link here")
+                            .font(.stacksText(size: 31, weight: .semibold))
+                            .tracking(-0.9)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(Color.stacksInk)
 
-                Text("Paste your link here")
-                    .font(.stacksText(size: 31, weight: .semibold))
-                    .tracking(-0.9)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(Color.stacksInk)
-
-                Text("We’ll pull in the product image and the details we can find.")
-                    .font(.stacksText(size: 16, weight: .regular))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(Color.stacksMutedInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 34)
-
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Image(systemName: "link")
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(Color.stacksMutedInk)
-
-                    TextField("Paste product link", text: $link)
-                        .font(.stacksText(size: 16, weight: .regular))
-                        .foregroundStyle(Color.stacksInk)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .submitLabel(.go)
-                        .focused($isFocused)
-                        .disabled(isLoading)
-                        .onSubmit(onSubmit)
-                }
-                .padding(.horizontal, 17)
-                .frame(height: 56)
-
-                Divider().padding(.leading, 48)
-
-                Button(action: onSubmit) {
-                    HStack(spacing: 9) {
-                        if isLoading {
-                            ProgressView().tint(Color.stacksInk)
-                        } else {
-                            Image(systemName: "arrow.right")
-                        }
-                        Text(isLoading ? "Finding product" : "Find product")
+                        Text("We’ll pull in the product image and the details we can find.")
+                            .font(.stacksText(size: 16, weight: .regular))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(Color.stacksMutedInk)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.stacksText(size: 16, weight: .semibold))
-                    .foregroundStyle(hasLink ? Color.stacksInk : Color.stacksMutedInk)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 34)
+
+                    HStack(spacing: 12) {
+                        Image(systemName: "link")
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(Color.stacksMutedInk)
+
+                        TextField("Paste product link", text: $link)
+                            .font(.stacksText(size: 16, weight: .regular))
+                            .foregroundStyle(Color.stacksInk)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.URL)
+                            .textContentType(.URL)
+                            .submitLabel(.go)
+                            .focused($isFocused)
+                            .disabled(isLoading)
+                            .onSubmit(submit)
+                    }
                     .padding(.horizontal, 17)
                     .frame(height: 56)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(Color.white.opacity(0.72), lineWidth: 1)
+                    }
+                    .shadow(color: Color.black.opacity(0.08), radius: 22, y: 10)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 30)
+
+                    if isLoading {
+                        Text(loadingMessage)
+                            .font(.stacksText(size: 14, weight: .regular))
+                            .foregroundStyle(Color.stacksMutedInk)
+                            .contentTransition(.opacity)
+                            .padding(.top, 12)
+                    }
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 72)
+                .padding(.bottom, 28)
+            }
+            .scrollDismissesKeyboard(.interactively)
+
+            PrimaryButton(title: isLoading ? "Finding product" : "Find Product", isLoading: isLoading, action: submit)
                 .disabled(!hasLink || isLoading)
-            }
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.white.opacity(0.72), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.08), radius: 22, y: 10)
-            .padding(.horizontal, 24)
-            .padding(.top, 30)
-
-            if isLoading {
-                Text("Finding the best product image")
-                    .font(.stacksText(size: 14, weight: .regular))
-                    .foregroundStyle(Color.stacksMutedInk)
-                    .padding(.top, 12)
-            }
-
-            Spacer(minLength: 28)
+                .opacity(hasLink || isLoading ? 1 : 0.42)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 20)
+                .background(.thinMaterial)
         }
         .background(.thinMaterial)
         .onChange(of: isLoading) { _, loading in
             if loading { isFocused = false }
         }
+        .task(id: isLoading) {
+            guard isLoading else { return }
+
+            var index = 0
+            loadingMessage = Self.loadingMessages[index]
+
+            while !Task.isCancelled && isLoading {
+                try? await Task.sleep(for: .seconds(1.45))
+                guard !Task.isCancelled && isLoading else { return }
+
+                index = (index + 1) % Self.loadingMessages.count
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    loadingMessage = Self.loadingMessages[index]
+                }
+            }
+        }
+    }
+
+    private func submit() {
+        guard hasLink, !isLoading else { return }
+        isFocused = false
+        onSubmit()
     }
 }
 
@@ -273,6 +313,7 @@ enum PhotoProductImportStartingSource {
 struct ProductLinkImportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appServices) private var services
+    @Environment(StacksPro.self) private var pro
     @State private var link: String
     @State private var buyLink = ""
     @State private var imageLink = ""
@@ -290,18 +331,22 @@ struct ProductLinkImportSheet: View {
     @State private var selectedStackID: UUID?
     @State private var destination: ProductImportDestination
     @State private var newStackTitle = ""
-    @State private var newStackWishlistMode = false
+    @State private var newStackWishlistMode = true
     @State private var isLoadingStacks = true
     @State private var isPreviewing = false
     @State private var isSaving = false
+    @State private var saveItemID: UUID
     @State private var errorMessage: String?
+    @State private var imageImportNotice: String?
     @State private var visibleDetails: Set<ProductReviewOptionalField> = [.brand, .price, .description]
 
     let user: UserProfile
     let preferredStack: Stack?
     let locksDestination: Bool
     let initialNewStackTitle: String?
+    let initialNewStackWishlistMode: Bool
     let initialPreview: ProductLinkPreview?
+    let onCancel: (() -> Void)?
     let onSaved: (Stack) -> Void
 
     init(
@@ -311,21 +356,23 @@ struct ProductLinkImportSheet: View {
         preferredStack: Stack? = nil,
         locksDestination: Bool = false,
         initialNewStackTitle: String? = nil,
+        initialNewStackWishlistMode: Bool = true,
+        importID: UUID? = nil,
+        onCancel: (() -> Void)? = nil,
         onSaved: @escaping (Stack) -> Void
     ) {
-        let resolvedInitialPreview = initialPreview.map { preview in
-            var resolvedPreview = preview
-            if resolvedPreview.imageURL == nil {
-                resolvedPreview.imageURL = DemoProductImageCatalog.url(for: resolvedPreview.title)
-            }
-            return resolvedPreview
-        }
+        // Do not substitute a generic demo photo for a real retailer image. If
+        // a store does not expose one, show an honest photo-picker option.
+        let resolvedInitialPreview = initialPreview
         self.user = user
         self.preferredStack = preferredStack
         self.locksDestination = locksDestination
         self.initialNewStackTitle = initialNewStackTitle
+        self.initialNewStackWishlistMode = initialNewStackWishlistMode
         self.initialPreview = resolvedInitialPreview
+        self.onCancel = onCancel
         self.onSaved = onSaved
+        _saveItemID = State(initialValue: importID ?? UUID())
         _link = State(initialValue: resolvedInitialPreview?.sourceURL.absoluteString ?? initialURL?.absoluteString ?? "")
         _buyLink = State(initialValue: resolvedInitialPreview?.sourceURL.absoluteString ?? "")
         _imageLink = State(initialValue: resolvedInitialPreview?.imageURL?.absoluteString ?? "")
@@ -333,6 +380,7 @@ struct ProductLinkImportSheet: View {
         _draft = State(initialValue: resolvedInitialPreview.map(ProductImportDraft.init))
         _destination = State(initialValue: preferredStack == nil ? (initialNewStackTitle == nil ? .existing : .new) : .current)
         _newStackTitle = State(initialValue: initialNewStackTitle ?? "")
+        _newStackWishlistMode = State(initialValue: initialNewStackWishlistMode)
     }
 
     var body: some View {
@@ -348,6 +396,7 @@ struct ProductLinkImportSheet: View {
             }
     }
 
+    @ViewBuilder
     private var linkEditor: some View {
         Group {
             if draft == nil {
@@ -355,13 +404,15 @@ struct ProductLinkImportSheet: View {
                     link: $link,
                     isLoading: isPreviewing,
                     onSubmit: previewLink,
-                    onCancel: { dismiss() }
+                    onCancel: cancelImport
                 )
             } else {
                 ProductImportDetailScreen(
                     originalData: replacementImageData,
                     originalURL: replacementImageURL ?? validURL(imageLink),
                     removedBackgroundURL: removedBackgroundImageURL,
+                    selectedReplacementImage: $selectedReplacementImage,
+                    imageImportNotice: imageImportNotice,
                     title: draftBinding(\.title, default: ""),
                     brand: draftBinding(\.brand, default: ""),
                     price: $priceText,
@@ -376,7 +427,7 @@ struct ProductLinkImportSheet: View {
                     },
                     isSaving: isSaving,
                     canSave: isDraftValid,
-                    onCancel: { dismiss() },
+                    onCancel: cancelImport,
                     onSave: save
                 )
             }
@@ -389,8 +440,8 @@ struct ProductLinkImportSheet: View {
         .presentationBackground(.thinMaterial)
         .task {
             await loadStacks()
-            if let initialPreview, let imageURL = initialPreview.imageURL {
-                await preparePreviewRemoval(for: imageURL)
+            if let initialPreview {
+                await importInitialPreviewImage(initialPreview)
             } else if validURL(link) != nil, draft == nil {
                 previewLink()
             }
@@ -409,6 +460,14 @@ struct ProductLinkImportSheet: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
+        }
+    }
+
+    private func cancelImport() {
+        if let onCancel {
+            onCancel()
+        } else {
+            dismiss()
         }
     }
 
@@ -452,8 +511,8 @@ struct ProductLinkImportSheet: View {
                     }
                 }
 
-                EditorialProductField(label: "Product link", placeholder: "Paste the original link", text: $link, keyboardType: .URL)
-                EditorialProductField(label: "Buy link", placeholder: "Paste a checkout link", text: $buyLink, keyboardType: .URL)
+                EditorialProductField(label: "Purchase link", placeholder: "Paste where to buy it", text: $link, keyboardType: .URL)
+                    .onChange(of: link) { _, newValue in buyLink = newValue }
 
                 PhotosPicker(selection: $selectedReplacementImage, matching: .images) {
                     Label(replacementImageLabel, systemImage: "photo.badge.plus")
@@ -597,6 +656,10 @@ struct ProductLinkImportSheet: View {
             if stacks.isEmpty && preferredStack == nil && !locksDestination {
                 destination = .new
             }
+        } catch is CancellationError {
+            // SwiftUI cancels view-scoped tasks during sheet transitions.
+            // This is expected lifecycle behavior, not an import failure.
+            return
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -611,34 +674,63 @@ struct ProductLinkImportSheet: View {
         link = url.absoluteString
         isPreviewing = true
         Task {
+            defer { isPreviewing = false }
             do {
                 var preview = try await services.productSearch.previewProductLink(url)
-                var candidates: [URL] = []
-                if let previewImageURL = preview.imageURL {
-                    candidates.append(previewImageURL)
-                }
-                candidates += await ProductPageImageExtractor.productImageURLs(for: preview.sourceURL)
+                // Edge-function previews and direct page previews share the
+                // same editorial rules before the member sees the draft.
+                preview.title = ProductImportedCopy.conciseTitle(preview.title, brand: preview.brand)
+                preview.shortDescription = ""
+                var candidates = await ProductPageImageExtractor.productImageURLs(for: preview.sourceURL)
+                if let previewImageURL = preview.imageURL { candidates.append(previewImageURL) }
 
                 var seenCandidates = Set<URL>()
                 candidates = candidates.filter { seenCandidates.insert($0).inserted }
-                guard let resolvedImage = await firstDownloadableImage(from: candidates) else {
-                    throw AppError.unavailable("We found the product, but couldn't download a usable image. Try another link or add a photo.")
-                }
-
-                // Do not enter the product editor until we have an actual image to
-                // show and isolate. This prevents a title-only detail page after a
-                // retailer returns metadata but its first image request fails.
-                beginRemovalMoment()
-                removedBackgroundImageURL = nil
-                replacementImageURL = resolvedImage.url
-                replacementImageData = resolvedImage.data
-
-                preview.imageURL = resolvedImage.url
                 draft = ProductImportDraft(preview: preview)
                 link = preview.sourceURL.absoluteString
                 buyLink = preview.sourceURL.absoluteString
-                imageLink = resolvedImage.url.absoluteString
                 priceText = preview.price.map(decimalText) ?? ""
+                imageImportNotice = preview.importWarningCode == "unavailable"
+                    ? "This retailer says the listing is unavailable. Check the purchase link before saving."
+                    : nil
+
+                var resolvedImage = await firstDownloadableImage(from: candidates)
+                if resolvedImage == nil,
+                   let metadataImageURL = await ProductPageImageExtractor.linkPresentationImageURL(for: preview.sourceURL),
+                   let metadataImageData = await downloadedImageData(from: metadataImageURL),
+                   ProductPageImageExtractor.isUsableProductImage(metadataImageData, sourceURL: metadataImageURL) {
+                    resolvedImage = (metadataImageURL, metadataImageData)
+                }
+
+                guard let resolvedImage else {
+                    // Product metadata is still valuable. Let the member save
+                    // it and optionally attach a photo rather than failing a
+                    // valid link because a retailer blocks hotlinks.
+                    var importedDraft = ProductImportDraft(preview: preview)
+                    importedDraft.imageURL = nil
+                    draft = importedDraft
+                    imageLink = ""
+                    switch preview.importWarningCode {
+                    case "unavailable":
+                        imageImportNotice = "This retailer says the listing is unavailable. Check the purchase link, or add a photo and edit the details before saving."
+                    case "blocked", "challenge", "redirect_loop":
+                        imageImportNotice = "This store requires browser verification. If it opens in Safari, share it to Stacks from there; or add a photo from your camera roll and keep this link."
+                    default:
+                        imageImportNotice = "We found the product details, but this store did not share a usable product photo. Add one from your camera roll if you want a cutout."
+                    }
+                    return
+                }
+
+                beginRemovalMoment()
+                removedBackgroundImageURL = nil
+                let localImageURL = try writeImportedImageData(resolvedImage.data)
+                replacementImageURL = localImageURL
+                replacementImageData = resolvedImage.data
+                imageLink = localImageURL.absoluteString
+
+                // Always isolate the bytes we already downloaded. Marketplace
+                // CDNs often reject a second unauthenticated request.
+                await preparePreviewRemoval(for: localImageURL, managesLoadingState: false)
 
                 do {
                     let uploadedURL = try await services.storage.uploadImageData(
@@ -646,17 +738,15 @@ struct ProductLinkImportSheet: View {
                         preferredName: preview.title
                     )
                     replacementImageURL = uploadedURL
-                    await preparePreviewRemoval(for: uploadedURL, managesLoadingState: false)
                 } catch {
-                    // Background removal can work directly against a retailer CDN
-                    // when local storage is unavailable in the current environment.
-                    replacementImageURL = resolvedImage.url
-                    await preparePreviewRemoval(for: resolvedImage.url, managesLoadingState: false)
+                    // The durable local original remains available when storage
+                    // is offline; removal has already completed from local bytes.
                 }
+            } catch is CancellationError {
+                return
             } catch {
                 errorMessage = error.localizedDescription
             }
-            isPreviewing = false
         }
     }
 
@@ -683,13 +773,65 @@ struct ProductLinkImportSheet: View {
         }
     }
 
-    private func firstDownloadableImage(from candidates: [URL]) async -> (url: URL, data: Data)? {
-        for candidate in candidates.prefix(12) {
-            if let data = await downloadedImageData(from: candidate) {
-                return (candidate, data)
-            }
+    private func writeImportedImageData(_ data: Data) throws -> URL {
+        guard UIImage(data: data) != nil else {
+            throw AppError.unavailable("The product image could not be decoded.")
         }
-        return nil
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ).appendingPathComponent("Stacks/ProductImports", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("\(UUID().uuidString).image")
+        try data.write(to: url, options: [.atomic])
+        return url
+    }
+
+    private func firstDownloadableImage(from candidates: [URL]) async -> (url: URL, data: Data)? {
+        await ProductPageImageExtractor.firstDownloadableImage(from: candidates)
+    }
+
+    private func importInitialPreviewImage(_ preview: ProductLinkPreview) async {
+        var candidates = await ProductPageImageExtractor.productImageURLs(for: preview.sourceURL)
+        if let imageURL = preview.imageURL { candidates.append(imageURL) }
+        var seen = Set<URL>()
+        candidates = candidates.filter { seen.insert($0).inserted }
+
+        var resolvedImage = await firstDownloadableImage(from: candidates)
+        if resolvedImage == nil,
+           let metadataImageURL = await ProductPageImageExtractor.linkPresentationImageURL(for: preview.sourceURL),
+           let data = await downloadedImageData(from: metadataImageURL),
+           ProductPageImageExtractor.isUsableProductImage(data, sourceURL: metadataImageURL) {
+            resolvedImage = (metadataImageURL, data)
+        }
+
+        guard let resolvedImage else {
+            imageLink = ""
+            draft?.imageURL = nil
+            imageImportNotice = "We found the product details, but not a usable photo. Add one from your camera roll if you want a cutout."
+            return
+        }
+
+        do {
+            let localURL = try writeImportedImageData(resolvedImage.data)
+            replacementImageURL = localURL
+            replacementImageData = resolvedImage.data
+            imageLink = localURL.absoluteString
+            beginRemovalMoment()
+            removedBackgroundImageURL = nil
+            await preparePreviewRemoval(for: localURL, managesLoadingState: false)
+
+            if let uploadedURL = try? await services.storage.uploadImageData(
+                resolvedImage.data, preferredName: draft?.title ?? preview.title
+            ) {
+                replacementImageURL = uploadedURL
+                imageLink = uploadedURL.absoluteString
+            }
+        } catch {
+            imageImportNotice = "We couldn't prepare the product photo. Add one from your camera roll if you want a cutout."
+        }
     }
 
     private func save() {
@@ -718,14 +860,22 @@ struct ProductLinkImportSheet: View {
                     importedDraft.imageURL = validURL(imageLink)
                 }
                 let target = try await targetStack()
+                if target.items.contains(where: { $0.id == saveItemID }) {
+                    onSaved(target)
+                    dismiss()
+                    return
+                }
+                guard pro.requireItemSlot(in: target, resume: save) else { return }
+                let savedDescription = importedDraft.shortDescription.trimmingCharacters(in: .whitespacesAndNewlines)
                 let item = StackItem(
-                    id: UUID(), stackID: target.id,
+                    id: saveItemID, stackID: target.id,
                     title: importedDraft.title.trimmingCharacters(in: .whitespacesAndNewlines),
                     brand: importedDraft.brand.trimmingCharacters(in: .whitespacesAndNewlines),
-                    shortDescription: importedDraft.shortDescription.trimmingCharacters(in: .whitespacesAndNewlines),
+                    shortDescription: savedDescription,
+                    isDescriptionUserAuthored: !savedDescription.isEmpty,
                     price: importedDraft.price ?? 0, currencyCode: importedDraft.currencyCode,
                     sourceURL: sourceURL, buyURL: buyURL,
-                    affiliateURL: try? await services.affiliate.affiliateURL(for: buyURL),
+                    affiliateURL: nil,
                     originalImageURL: importedDraft.imageURL,
                     removedBackgroundImageURL: removedBackgroundImageURL,
                     removalStatus: removedBackgroundImageURL != nil ? .complete : (importedDraft.imageURL == nil ? .complete : .processing),
@@ -740,6 +890,16 @@ struct ProductLinkImportSheet: View {
                 }
                 dismiss()
             } catch {
+                if let existingStacks = try? await services.stacks.fetchMyStacks(for: user.id),
+                   let saved = existingStacks.first(where: { $0.items.contains(where: { $0.id == saveItemID }) }) {
+                    onSaved(saved)
+                    dismiss()
+                    return
+                }
+                if StacksPro.isItemLimitError(error) {
+                    pro.present(.itemLimit, resume: save)
+                    return
+                }
                 errorMessage = error.localizedDescription
                 services.haptics.notification(.error)
             }
@@ -832,6 +992,7 @@ struct ProductLinkImportSheet: View {
             return try await services.stacks.createStack(
                 title: newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 wishlistMode: newStackWishlistMode,
+                visibility: .private,
                 owner: user
             )
         }
@@ -1110,9 +1271,12 @@ private struct EditorialProductPreview: View {
 /// The post-import editor deliberately mirrors a saved product page. Imported
 /// values are editable in place while unknown values stay visible as prompts.
 private struct ProductImportDetailScreen: View {
+    @Environment(\.openURL) private var openURL
     let originalData: Data?
     let originalURL: URL?
     let removedBackgroundURL: URL?
+    @Binding var selectedReplacementImage: PhotosPickerItem?
+    let imageImportNotice: String?
     @Binding var title: String
     @Binding var brand: String
     @Binding var price: String
@@ -1143,9 +1307,42 @@ private struct ProductImportDetailScreen: View {
                     ImportCutoutStage(
                         originalData: originalData,
                         originalURL: originalURL,
-                        removedBackgroundURL: removedBackgroundURL
+                        removedBackgroundURL: removedBackgroundURL,
+                        height: 280
                     )
-                    .padding(.top, 60)
+                    .padding(.top, 54)
+
+                    if originalData == nil && originalURL == nil {
+                        PhotosPicker(selection: $selectedReplacementImage, matching: .images) {
+                            Label("Add a product photo", systemImage: "photo.badge.plus")
+                                .font(.stacksText(size: 16, weight: .semibold))
+                                .foregroundStyle(Color.stacksInk)
+                                .padding(.horizontal, 18)
+                                .frame(height: 46)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 8)
+                    }
+
+                    if let imageImportNotice {
+                        VStack(spacing: 8) {
+                            Text(imageImportNotice)
+                                .font(.stacksText(size: 15, weight: .regular))
+                                .foregroundStyle(Color.stacksMutedInk)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let url = URL(string: sourceLink), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                                Button("Check product page", systemImage: "arrow.up.right") {
+                                    openURL(url)
+                                }
+                                .font(.stacksText(size: 15, weight: .medium))
+                                .foregroundStyle(Color.stacksInk)
+                            }
+                        }
+                        .padding(.horizontal, 34)
+                        .padding(.top, 8)
+                    }
 
                     VStack(spacing: 18) {
                         ImportTitleField(title: $title, showsEditableShimmer: showsEditableShimmer)
@@ -1165,19 +1362,13 @@ private struct ProductImportDetailScreen: View {
                         if showsLinks {
                             VStack(spacing: 0) {
                                 ImportDetailRow(
-                                    label: "Product link",
-                                    placeholder: "Paste the original link",
+                                    label: "Purchase link",
+                                    placeholder: "Paste where to buy it",
                                     text: $sourceLink,
                                     keyboardType: .URL,
                                     showsEditableShimmer: showsEditableShimmer
                                 )
-                                ImportDetailRow(
-                                    label: "Buy link",
-                                    placeholder: "Paste a checkout link",
-                                    text: $buyLink,
-                                    keyboardType: .URL,
-                                    showsEditableShimmer: showsEditableShimmer
-                                )
+                                .onChange(of: sourceLink) { _, newValue in buyLink = newValue }
                             }
                             .padding(.horizontal, 24)
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1185,9 +1376,10 @@ private struct ProductImportDetailScreen: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
-                    .padding(.bottom, 112)
+                    .padding(.bottom, 24)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
 
             HStack {
                 Button(action: onCancel) {
@@ -1254,6 +1446,7 @@ private struct ImportCutoutStage: View {
     let originalData: Data?
     let originalURL: URL?
     let removedBackgroundURL: URL?
+    let height: CGFloat
 
     var body: some View {
         Group {
@@ -1272,7 +1465,7 @@ private struct ImportCutoutStage: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 390)
+        .frame(height: height)
         .padding(.horizontal, 26)
     }
 
@@ -1371,20 +1564,20 @@ private struct ImportMetadataCard: View {
     let showsEditableShimmer: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
             ImportMetadataInput(
                 label: "Brand",
                 placeholder: "Add brand",
                 text: $brand,
                 showsEditableShimmer: showsEditableShimmer
             )
-            Divider().frame(height: 42)
+            metadataDivider
             ImportPriceInput(
                 price: $price,
                 currencyCode: $currencyCode,
                 showsEditableShimmer: showsEditableShimmer
             )
-            Divider().frame(height: 42)
+            metadataDivider
             ImportStackInput(
                 stackName: stackName,
                 stackOptions: stackOptions,
@@ -1392,12 +1585,17 @@ private struct ImportMetadataCard: View {
                 showsEditableShimmer: showsEditableShimmer
             )
         }
-        .padding(.vertical, 14)
         .stacksGlass(cornerRadius: 22)
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(.white.opacity(0.68), lineWidth: 1)
         }
+    }
+
+    private var metadataDivider: some View {
+        Divider()
+            .overlay(Color.stacksInk.opacity(0.08))
+            .padding(.horizontal, 16)
     }
 }
 
@@ -1408,8 +1606,10 @@ private struct ImportStackInput: View {
     let showsEditableShimmer: Bool
 
     var body: some View {
-        VStack(spacing: 5) {
+        HStack(spacing: 16) {
             ImportMetadataLabel(text: "Stack")
+                .frame(width: 58, alignment: .leading)
+            Spacer(minLength: 0)
             if let onSelectStack, stackOptions.count > 1 {
                 Menu {
                     ForEach(stackOptions, id: \.self) { option in
@@ -1423,7 +1623,8 @@ private struct ImportStackInput: View {
                 stackValue
             }
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 62)
         .accessibilityLabel("Stack")
     }
 
@@ -1432,12 +1633,14 @@ private struct ImportStackInput: View {
         ZStack {
             Text(stackName)
                 .font(.stacksText(size: 14, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 .foregroundStyle(Color.stacksInk)
             if showsEditableShimmer {
                 ImportShimmerPlaceholder(text: stackName, font: .stacksText(size: 14, weight: .semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
                     .opacity(0.52)
                     .allowsHitTesting(false)
             }
@@ -1452,12 +1655,13 @@ private struct ImportMetadataInput: View {
     let showsEditableShimmer: Bool
 
     var body: some View {
-        VStack(spacing: 5) {
+        HStack(spacing: 16) {
             ImportMetadataLabel(text: label)
+                .frame(width: 58, alignment: .leading)
             ZStack {
                 TextField("", text: $text)
                     .font(.stacksText(size: 14, weight: .semibold))
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.trailing)
                     .textInputAutocapitalization(.words)
                     .textContentType(.name)
                     .foregroundStyle(Color.stacksInk)
@@ -1470,8 +1674,10 @@ private struct ImportMetadataInput: View {
                         .allowsHitTesting(false)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 62)
     }
 }
 
@@ -1481,9 +1687,22 @@ private struct ImportPriceInput: View {
     let showsEditableShimmer: Bool
 
     var body: some View {
-        VStack(spacing: 5) {
+        HStack(spacing: 16) {
             ImportMetadataLabel(text: "Price")
-            HStack(spacing: 2) {
+                .frame(width: 58, alignment: .leading)
+            Spacer(minLength: 0)
+            HStack(spacing: 5) {
+                Menu {
+                    ForEach(["USD", "EUR", "GBP", "CAD", "AUD"], id: \.self) { code in
+                        Button(code) { currencyCode = code }
+                    }
+                } label: {
+                    Text(currencyCode)
+                        .font(.stacksText(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.stacksMutedInk)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+
                 ZStack {
                     TextField("", text: $price)
                         .font(.stacksText(size: 14, weight: .semibold))
@@ -1495,20 +1714,15 @@ private struct ImportPriceInput: View {
                     } else if showsEditableShimmer {
                         ImportShimmerPlaceholder(text: price, font: .stacksText(size: 14, weight: .semibold))
                             .opacity(0.52)
-                            .allowsHitTesting(false)
+                        .allowsHitTesting(false)
                     }
                 }
-                Menu(currencyCode) {
-                    ForEach(["USD", "EUR", "GBP", "CAD", "AUD"], id: \.self) { code in
-                        Button(code) { currencyCode = code }
-                    }
-                }
-                .font(.stacksText(size: 11, weight: .regular))
-                .foregroundStyle(Color.stacksMutedInk)
+                .frame(minWidth: 0, maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 190, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 62)
     }
 }
 
@@ -1697,9 +1911,11 @@ private struct ProductImportRemovalMoment: View {
 struct PhotoProductImportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appServices) private var services
+    @Environment(StacksPro.self) private var pro
     @State private var isShowingCamera = false
     @State private var isShowingPhotoLibrary = false
     @State private var imageData: Data?
+    @State private var selectedReplacementImage: PhotosPickerItem?
     @State private var originalImageURL: URL?
     @State private var removedBackgroundImageURL: URL?
     @State private var isRemovingBackground = false
@@ -1718,7 +1934,7 @@ struct PhotoProductImportSheet: View {
     @State private var selectedStackID: UUID?
     @State private var destination: ProductImportDestination
     @State private var newStackTitle = ""
-    @State private var newStackWishlistMode = false
+    @State private var newStackWishlistMode = true
     @State private var isLoadingStacks = true
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -1730,6 +1946,8 @@ struct PhotoProductImportSheet: View {
     let startingSource: PhotoProductImportStartingSource
     let locksDestination: Bool
     let initialNewStackTitle: String?
+    let initialNewStackWishlistMode: Bool
+    let onCancel: (() -> Void)?
     let onSaved: (Stack) -> Void
 
     init(
@@ -1740,6 +1958,8 @@ struct PhotoProductImportSheet: View {
         preferredStack: Stack? = nil,
         locksDestination: Bool = false,
         initialNewStackTitle: String? = nil,
+        initialNewStackWishlistMode: Bool = true,
+        onCancel: (() -> Void)? = nil,
         onSaved: @escaping (Stack) -> Void
     ) {
         self.user = user
@@ -1748,10 +1968,13 @@ struct PhotoProductImportSheet: View {
         self.startingSource = startingSource
         self.locksDestination = locksDestination
         self.initialNewStackTitle = initialNewStackTitle
+        self.initialNewStackWishlistMode = initialNewStackWishlistMode
+        self.onCancel = onCancel
         self.onSaved = onSaved
         _imageData = State(initialValue: initialImageData)
         _destination = State(initialValue: preferredStack == nil ? (initialNewStackTitle == nil ? .existing : .new) : .current)
         _newStackTitle = State(initialValue: initialNewStackTitle ?? "")
+        _newStackWishlistMode = State(initialValue: initialNewStackWishlistMode)
     }
 
     var body: some View {
@@ -1772,6 +1995,8 @@ struct PhotoProductImportSheet: View {
             originalData: imageData,
             originalURL: originalImageURL,
             removedBackgroundURL: removedBackgroundImageURL,
+            selectedReplacementImage: $selectedReplacementImage,
+            imageImportNotice: nil,
             title: $title,
             brand: $brand,
             price: $priceText,
@@ -1786,7 +2011,7 @@ struct PhotoProductImportSheet: View {
             },
             isSaving: isSaving,
             canSave: canSave,
-            onCancel: { dismiss() },
+            onCancel: cancelImport,
             onSave: save
         )
         .task {
@@ -1799,6 +2024,11 @@ struct PhotoProductImportSheet: View {
         .onChange(of: imageData) { _, newData in
             guard let newData else { return }
             Task { await preparePhoto(newData) }
+        }
+        .task(id: selectedReplacementImage) {
+            guard let selectedReplacementImage,
+                  let selectedData = try? await selectedReplacementImage.loadTransferable(type: Data.self) else { return }
+            imageData = selectedData
         }
         .sheet(isPresented: $isShowingCamera) {
             CameraCaptureView(imageData: $imageData)
@@ -1826,6 +2056,14 @@ struct PhotoProductImportSheet: View {
         }
     }
 
+    private func cancelImport() {
+        if let onCancel {
+            onCancel()
+        } else {
+            dismiss()
+        }
+    }
+
     private var photoSection: some View {
         let photoLabel = imageData == nil ? "Choose from Library" : "Choose Another Photo"
         return Section {
@@ -1838,7 +2076,7 @@ struct PhotoProductImportSheet: View {
             .listRowInsets(.init())
             .listRowBackground(Color.white)
 
-            if let removalError, let imageData {
+            if removalError != nil, let imageData {
                 Button("Try Background Removal Again") {
                     Task { await preparePhoto(imageData) }
                 }
@@ -1890,8 +2128,8 @@ struct PhotoProductImportSheet: View {
                     }
                 }
 
-                EditorialProductField(label: "Product link", placeholder: "Paste the original link", text: $sourceLink, keyboardType: .URL)
-                EditorialProductField(label: "Buy link", placeholder: "Paste a checkout link", text: $buyLink, keyboardType: .URL)
+                EditorialProductField(label: "Purchase link", placeholder: "Paste where to buy it", text: $sourceLink, keyboardType: .URL)
+                    .onChange(of: sourceLink) { _, newValue in buyLink = newValue }
 
                 Menu {
                     ForEach(ProductReviewOptionalField.allCases.filter { !visibleDetails.contains($0) }, id: \.self) { field in
@@ -2095,6 +2333,7 @@ struct PhotoProductImportSheet: View {
             defer { isSaving = false }
             do {
                 let target = try await targetStack()
+                guard pro.requireItemSlot(in: target, resume: save) else { return }
                 let itemID = UUID()
                 let internalFindURL = URL(string: "https://stacks.app/finds/\(itemID.uuidString)")!
                 let sourceURL = validURL(sourceLink) ?? validURL(buyLink) ?? internalFindURL
@@ -2104,9 +2343,10 @@ struct PhotoProductImportSheet: View {
                     title: title.trimmingCharacters(in: .whitespacesAndNewlines),
                     brand: brand.trimmingCharacters(in: .whitespacesAndNewlines),
                     shortDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),
+                    isDescriptionUserAuthored: true,
                     price: decimalPrice(priceText) ?? 0, currencyCode: currencyCode,
                     sourceURL: sourceURL, buyURL: buyURL,
-                    affiliateURL: try? await services.affiliate.affiliateURL(for: buyURL),
+                    affiliateURL: nil,
                     originalImageURL: originalImageURL,
                     removedBackgroundImageURL: removedBackgroundImageURL,
                     removalStatus: removedBackgroundImageURL != nil ? .complete : (originalImageURL == nil ? .complete : .failed),
@@ -2118,6 +2358,10 @@ struct PhotoProductImportSheet: View {
                 onSaved(savedStack)
                 dismiss()
             } catch {
+                if StacksPro.isItemLimitError(error) {
+                    pro.present(.itemLimit, resume: save)
+                    return
+                }
                 errorMessage = error.localizedDescription
                 services.haptics.notification(.error)
             }
@@ -2137,6 +2381,7 @@ struct PhotoProductImportSheet: View {
             return try await services.stacks.createStack(
                 title: newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 wishlistMode: newStackWishlistMode,
+                visibility: .private,
                 owner: user
             )
         }

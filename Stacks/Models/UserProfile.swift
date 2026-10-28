@@ -8,6 +8,7 @@ struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     var bio: String
     var linkInBioURL: URL?
     var isFollowing: Bool
+    var profileShareEnabled: Bool? = nil
 
     var initials: String {
         displayName
@@ -18,4 +19,3 @@ struct UserProfile: Identifiable, Codable, Hashable, Sendable {
             .joined()
     }
 }
-

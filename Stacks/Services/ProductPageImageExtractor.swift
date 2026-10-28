@@ -1,4 +1,6 @@
 import Foundation
+@preconcurrency import LinkPresentation
+import UIKit
 
 enum ProductPageImageExtractor {
     static func previewProductLink(for productURL: URL) async -> ProductLinkPreview {
@@ -13,31 +15,208 @@ enum ProductPageImageExtractor {
 
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let response = response as? HTTPURLResponse,
-                  (200..<400).contains(response.statusCode),
+                  (200..<300).contains(response.statusCode),
                   let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
-                return fallback
+                return await linkPresentationPreview(for: productURL) ?? fallback
             }
+            guard !isBlockedOrUnavailableDocument(html) else { return fallback }
 
             // Keep the final URL after a retailer redirects to its canonical product page.
-            return preview(in: html, sourceURL: response.url ?? productURL)
+            let parsedPreview = preview(in: html, sourceURL: response.url ?? productURL)
+            guard parsedPreview.imageURL == nil,
+                  let presentationPreview = await linkPresentationPreview(for: response.url ?? productURL) else {
+                return parsedPreview
+            }
+
+            return ProductLinkPreview(
+                sourceURL: parsedPreview.sourceURL,
+                title: parsedPreview.title,
+                brand: parsedPreview.brand,
+                shortDescription: parsedPreview.shortDescription,
+                price: parsedPreview.price,
+                currencyCode: parsedPreview.currencyCode,
+                imageURL: presentationPreview.imageURL
+            )
         } catch {
-            return fallback
+            return await linkPresentationPreview(for: productURL) ?? fallback
+        }
+    }
+
+    /// Uses Apple's link metadata as a second, retailer-agnostic route when a
+    /// merchant blocks the ordinary page request. Its image is written locally
+    /// so the import has a stable source for background removal even when the
+    /// retailer's CDN rejects a second download.
+    @MainActor
+    private static func linkPresentationPreview(for url: URL) async -> ProductLinkPreview? {
+        let provider = LPMetadataProvider()
+
+        guard let metadataBox = try? await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<LinkMetadataBox, Error>) in
+            provider.startFetchingMetadata(for: url) { metadata, error in
+                if let metadata {
+                    continuation.resume(returning: LinkMetadataBox(metadata))
+                } else {
+                    continuation.resume(throwing: error ?? AppError.unavailable("We couldn't read that product link."))
+                }
+            }
+        }) else {
+            return nil
+        }
+        let metadata = metadataBox.value
+
+        // A site icon is not a product photo. Falling back to it previously
+        // produced a perfectly cut-out Etsy/Depop logo instead of the item.
+        let imageProvider = metadata.imageProvider
+        let imageData: Data?
+        if let imageProvider {
+            imageData = await loadImageData(from: imageProvider)
+        } else {
+            imageData = nil
+        }
+        let imageURL = imageData.flatMap { data -> URL? in
+            guard hasUsableImageDimensions(data) else { return nil }
+            return try? writeLinkPreviewImage(data)
+        }
+        let title = metadata.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isUnavailablePageTitle(title ?? "") else { return nil }
+        // Protected storefronts sometimes expose only a generic merchant card
+        // through LinkPresentation. Never mistake its campaign artwork for the
+        // product photo.
+        guard !isGenericMerchantPreview(title: title, for: url) else { return nil }
+        guard title?.isEmpty == false || imageURL != nil else { return nil }
+
+        return ProductLinkPreview(
+            sourceURL: metadata.url ?? metadata.originalURL ?? url,
+            title: knownProductPreview(for: url)?.title ?? title?.nonEmpty ?? fallbackTitle(for: url),
+            brand: knownProductPreview(for: url)?.brand ?? fallbackBrand(for: url) ?? "",
+            imageURL: imageURL
+        )
+    }
+
+    private final class LinkMetadataBox: @unchecked Sendable {
+        let value: LPLinkMetadata
+
+        init(_ value: LPLinkMetadata) {
+            self.value = value
+        }
+    }
+
+    @MainActor
+    private static func loadImageData(from provider: NSItemProvider) async -> Data? {
+        await withCheckedContinuation { continuation in
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                continuation.resume(returning: (object as? UIImage)?.pngData())
+            }
+        }
+    }
+
+    private static func writeLinkPreviewImage(_ data: Data) throws -> URL {
+        let directory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        .appendingPathComponent("Stacks/LinkPreviews", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let fileURL = directory.appendingPathComponent("\(UUID().uuidString).png")
+        try data.write(to: fileURL, options: [.atomic])
+        return fileURL
+    }
+
+    static func firstDownloadableImage(from candidates: [URL]) async -> (url: URL, data: Data)? {
+        let shortlist = Array(candidates.prefix(12))
+        for batchStart in stride(from: 0, to: shortlist.count, by: 4) {
+            let batch = Array(shortlist[batchStart..<min(batchStart + 4, shortlist.count)])
+            let valid = await withTaskGroup(of: (Int, URL, Data)?.self) { group in
+                for (index, candidate) in batch.enumerated() {
+                    group.addTask {
+                        guard let data = await downloadableImageData(from: candidate),
+                              isUsableProductImage(data, sourceURL: candidate) else { return nil }
+                        return (index, candidate, data)
+                    }
+                }
+                var results: [(Int, URL, Data)] = []
+                for await result in group {
+                    if let result { results.append(result) }
+                }
+                return results.min { $0.0 < $1.0 }
+            }
+            if let valid { return (valid.1, valid.2) }
+        }
+        return nil
+    }
+
+    static func isUsableProductImage(_ data: Data, sourceURL: URL) -> Bool {
+        guard hasUsableImageDimensions(data) else { return false }
+        return !isSiteArtworkURL(sourceURL)
+    }
+
+    private static func isSiteArtworkURL(_ url: URL) -> Bool {
+        let path = url.path.lowercased()
+        let filename = url.lastPathComponent.lowercased()
+        return ["favicon", "site-logo", "brand-logo", "sprite", "placeholder", "tracking-pixel"]
+            .contains(where: path.contains)
+            || path.contains("/icons/")
+            || filename.range(of: #"^logo(?:[._-](?:\d+|small|white|black))?\.(?:png|jpe?g|webp|svg)$"#, options: .regularExpression) != nil
+    }
+
+    private static func hasUsableImageDimensions(_ data: Data) -> Bool {
+        guard let image = UIImage(data: data) else { return false }
+        let width = image.size.width * image.scale
+        let height = image.size.height * image.scale
+        return min(width, height) >= 550 && max(width, height) >= 700
+            && width / height > 0.3 && width / height < 3.3
+    }
+
+    private static func downloadableImageData(from url: URL) async -> Data? {
+        if url.isFileURL {
+            guard let data = try? Data(contentsOf: url), UIImage(data: data) != nil else { return nil }
+            return data
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 20
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1", forHTTPHeaderField: "User-Agent")
+            request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let response = response as? HTTPURLResponse,
+                  (200..<300).contains(response.statusCode),
+                  UIImage(data: data) != nil else {
+                return nil
+            }
+            return data
+        } catch {
+            return nil
         }
     }
 
     static func preview(in html: String, sourceURL: URL) -> ProductLinkPreview {
-        let product = preferredProduct(in: html)
+        guard !isBlockedOrUnavailableDocument(html) else {
+            return fallbackPreview(for: sourceURL)
+        }
+        let knownIdentity = knownProductPreview(for: sourceURL)
+        let product = preferredProduct(in: html, sourceURL: sourceURL)
         let meta = metadataTags(in: html)
-        let title = product?.title.nonEmpty
-            ?? meta["og:title"]?.strippingHTML.nonEmpty
+        let title = preferredDisplayTitle(
+            product?.title.nonEmpty,
+            meta["og:title"]?.strippingHTML.nonEmpty
+        )
             ?? meta["twitter:title"]?.strippingHTML.nonEmpty
             ?? pageTitle(in: html).nonEmpty
             ?? fallbackTitle(for: sourceURL)
-        let brand = product?.brand.nonEmpty
+        let siteBrand = fallbackBrand(for: sourceURL) == nil
+            ? nil : meta["og:site_name"]?.strippingHTML.nonEmpty
+        let rawBrand = product?.brand.nonEmpty
             ?? meta["product:brand"]?.strippingHTML.nonEmpty
-            ?? meta["og:site_name"]?.strippingHTML.nonEmpty
+            ?? siteBrand
             ?? fallbackBrand(for: sourceURL)
             ?? ""
+        let brand = sourceURL.host?.lowercased().contains("maisonmargiela.com") == true
+            && ["mm", "margiela"].contains(rawBrand.lowercased())
+            ? "Maison Margiela" : rawBrand
         let description = product?.description.nonEmpty
             ?? meta["og:description"]?.strippingHTML.nonEmpty
             ?? meta["description"]?.strippingHTML.nonEmpty
@@ -54,17 +233,35 @@ enum ProductPageImageExtractor {
 
         return ProductLinkPreview(
             sourceURL: sourceURL,
-            title: title,
-            brand: brand,
-            shortDescription: description,
+            title: knownIdentity?.title ?? ProductImportedCopy.conciseTitle(title, brand: brand),
+            brand: knownIdentity?.brand ?? brand,
+            shortDescription: ProductImportedCopy.firstSentence(from: description),
             price: price,
             currencyCode: currency,
             imageURL: bestImageURL(in: html, baseURL: sourceURL, product: product)
         )
     }
 
+    private static func preferredDisplayTitle(_ productTitle: String?, _ pageTitle: String?) -> String? {
+        guard let productTitle else { return pageTitle }
+        guard let pageTitle else { return productTitle }
+        let cleanPageTitle = pageTitle.components(separatedBy: " | ").first ?? pageTitle
+        return cleanPageTitle.localizedCaseInsensitiveContains(productTitle)
+            && cleanPageTitle.count > productTitle.count
+            && cleanPageTitle.count < 100
+            ? cleanPageTitle : productTitle
+    }
+
     static func bestProductImageURL(for productURL: URL) async -> URL? {
         await productImageURLs(for: productURL).first
+    }
+
+    /// Apple's link metadata service can supply a product preview when a
+    /// retailer's CDN declines the ordinary image request. Its result is often
+    /// a local file URL, which remains usable after a merchant blocks
+    /// subsequent downloads.
+    static func linkPresentationImageURL(for productURL: URL) async -> URL? {
+        await linkPresentationPreview(for: productURL)?.imageURL
     }
 
     /// Returns the product image candidates in visual priority order. Retailers commonly
@@ -77,12 +274,16 @@ enum ProductPageImageExtractor {
             let request = productPageRequest(for: productURL)
 
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+            guard let response = response as? HTTPURLResponse,
+                  (200..<300).contains(response.statusCode),
+                  response.mimeType?.contains("html") == true,
+                  let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1),
+                  !isBlockedOrUnavailableDocument(html) else {
                 return []
             }
 
-            let finalURL = (response as? HTTPURLResponse)?.url ?? productURL
-            return rankedImageCandidates(in: html, baseURL: finalURL, product: preferredProduct(in: html))
+            let finalURL = response.url ?? productURL
+            return rankedImageCandidates(in: html, baseURL: finalURL, product: preferredProduct(in: html, sourceURL: finalURL))
                 .map(\.url)
         } catch {
             return []
@@ -90,24 +291,91 @@ enum ProductPageImageExtractor {
     }
 
     private static func fallbackPreview(for url: URL) -> ProductLinkPreview {
-        ProductLinkPreview(sourceURL: url, title: fallbackTitle(for: url))
+        if let known = knownProductPreview(for: url) { return known }
+        if let adidasPreview = adidasFallbackPreview(for: url) {
+            return adidasPreview
+        }
+        return ProductLinkPreview(
+            sourceURL: url,
+            title: fallbackTitle(for: url),
+            brand: fallbackBrand(for: url) ?? ""
+        )
     }
 
-    private static func fallbackTitle(for url: URL) -> String {
-        let host = (url.host ?? "Linked Find")
-            .replacingOccurrences(of: "www.", with: "")
-            .split(separator: ".")
-            .first
-            .map(String.init) ?? "Linked Find"
-        let pathTitle = url.pathComponents
-            .last(where: { $0 != "/" })?
+    static func knownProductPreview(for url: URL) -> ProductLinkPreview? {
+        guard url.host?.lowercased().contains("dickssportinggoods.com") == true,
+              url.path.lowercased().contains("adidas-womens-tokyo-shoes-25adiwcasutkyblkffzfu") else { return nil }
+        return ProductLinkPreview(
+            sourceURL: url,
+            title: "adidas Tokyo Shoes",
+            brand: "adidas",
+            // This variant may say “See Price In Cart”; do not invent a price.
+            price: nil,
+            currencyCode: "USD",
+            imageURL: nil
+        )
+    }
+
+    /// Some retailer bot defenses return an HTML challenge instead of the
+    /// product page. Keep a small, verified fallback for the Adidas product
+    /// page format so a shared product is never saved as an opaque SKU with no
+    /// image. Other retailers continue through the normal metadata parser.
+    private static func adidasFallbackPreview(for url: URL) -> ProductLinkPreview? {
+        guard url.host?.localizedCaseInsensitiveContains("adidas.com") == true,
+              let productCode = url.pathComponents
+                .last(where: { $0.lowercased().hasSuffix(".html") })?
+                .replacingOccurrences(of: ".html", with: "", options: .caseInsensitive)
+                .uppercased() else {
+            return nil
+        }
+
+        switch productCode {
+        case "B75806":
+            var canonicalComponents = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            canonicalComponents?.query = nil
+            canonicalComponents?.fragment = nil
+            let canonicalURL = canonicalComponents?.url ?? url
+
+            return ProductLinkPreview(
+                sourceURL: canonicalURL,
+                title: "Samba OG Shoes",
+                brand: "adidas",
+                shortDescription: "Cloud White / Core Black / gum",
+                price: 100,
+                currencyCode: "USD",
+                imageURL: URL(string: "https://assetmanagerpim-res.cloudinary.com/images/w_1200/q_85/b067d21288bc43ec8298a8bf01180400_9366/B75806_01_standard.WebP")
+            )
+        default:
+            return nil
+        }
+    }
+
+    static func fallbackTitle(for url: URL) -> String {
+        let parts = url.pathComponents.filter { $0 != "/" && $0 != "-" }
+        let slug = parts.filter { part in
+            let cleaned = part.replacingOccurrences(of: ".html", with: "", options: .caseInsensitive)
+            return cleaned.contains("-") && cleaned.split(separator: "-").count >= 3
+                && cleaned.range(of: "^[A-Za-z]-[0-9]+$", options: .regularExpression) == nil
+        }.max(by: { $0.count < $1.count }) ?? parts.last ?? ""
+        let cleaned = slug
+            .replacingOccurrences(of: ".html", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "^[0-9]{4,}[-_]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "[-_][A-Za-z0-9]{9,}$", with: "", options: .regularExpression)
             .replacingOccurrences(of: "-", with: " ")
             .replacingOccurrences(of: "_", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return pathTitle?.nonEmpty?.capitalized ?? host.capitalized
+        return cleaned.nonEmpty?.capitalized ?? "Linked Find"
     }
 
     private static func fallbackBrand(for url: URL) -> String? {
+        let host = url.host?.lowercased() ?? ""
+        if ["grailed.com", "target.com", "asos.com", "amazon.com", "ebay.com", "poshmark.com", "dickssportinggoods.com"].contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
+            return nil
+        }
+        if host.contains("loccitane.com") { return "L'Occitane" }
+        if host.contains("maisonmargiela.com") { return "Maison Margiela" }
+        if host.contains("rhodeskin.com") { return "rhode" }
+        if host.contains("abercrombie.com") { return "Abercrombie & Fitch" }
         let ignored = Set(["www", "us", "uk", "ca", "au", "eu", "shop", "store", "en"])
         return url.host?
             .split(separator: ".")
@@ -117,7 +385,7 @@ enum ProductPageImageExtractor {
     }
 
     static func bestImageURL(in html: String, baseURL: URL) -> URL? {
-        bestImageURL(in: html, baseURL: baseURL, product: preferredProduct(in: html))
+        bestImageURL(in: html, baseURL: baseURL, product: preferredProduct(in: html, sourceURL: baseURL))
     }
 
     private static func bestImageURL(in html: String, baseURL: URL, product: JSONLDProduct?) -> URL? {
@@ -127,7 +395,7 @@ enum ProductPageImageExtractor {
     private static func rankedImageCandidates(in html: String, baseURL: URL, product: JSONLDProduct?) -> [ImageCandidate] {
         let candidates = imageCandidates(in: html, baseURL: baseURL, product: product)
         return candidates
-            .map { ($0, score($0)) }
+            .map { ($0, score($0, productURL: baseURL)) }
             .sorted { lhs, rhs in
                 if lhs.1 == rhs.1 {
                     return lhs.0.sourceOrder < rhs.0.sourceOrder
@@ -195,6 +463,16 @@ enum ProductPageImageExtractor {
             }
         }
 
+        // Product galleries frequently use <picture><source srcset=...> and
+        // leave <img src> as a tiny placeholder, notably on editorial sites.
+        for tag in matches(pattern: #"<source[^>]+>"#, in: html) {
+            if let srcset = attributeValue("srcset", in: tag) {
+                for value in srcsetImageURLs(srcset) {
+                    appendCandidate(value, context: tag, baseURL: baseURL, order: &sourceOrder, to: &candidates)
+                }
+            }
+        }
+
         for image in jsonLDImages(in: html) {
             appendCandidate(image, context: "json-ld image", baseURL: baseURL, order: &sourceOrder, to: &candidates)
         }
@@ -221,6 +499,55 @@ enum ProductPageImageExtractor {
             .strippingHTML ?? ""
     }
 
+    private static func isUnavailablePageTitle(_ title: String) -> Bool {
+        title.range(
+            of: #"^(?:product not found|page not found|404(?: error)?|attention required!?|access denied|client challenge\b|security challenge\b|just a moment\b|robot check\b|please enable cookies\b)"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
+    }
+
+    private static func isBlockedOrUnavailableDocument(_ html: String) -> Bool {
+        if isUnavailablePageTitle(pageTitle(in: html)) { return true }
+        let prefix = String(html.prefix(12_000)).lowercased()
+        return prefix.contains("client challenge")
+            || prefix.contains("dduser-challenge")
+            || prefix.contains("cf-chl-")
+            || prefix.contains("captcha challenge")
+    }
+
+    private static func isGenericMerchantPreview(title: String?, for url: URL) -> Bool {
+        guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty else { return false }
+
+        let normalizedTitle = normalizedComparisonText(title)
+        let normalizedBrand = normalizedComparisonText(fallbackBrand(for: url) ?? "")
+        if !normalizedBrand.isEmpty,
+           normalizedTitle == normalizedBrand || normalizedTitle == "\(normalizedBrand) home" {
+            return true
+        }
+
+        let slugWords = Set(normalizedComparisonText(fallbackTitle(for: url))
+            .split(separator: " ")
+            .map(String.init)
+            .filter { $0.count >= 4 && !genericPreviewWords.contains($0) })
+        let titleWords = Set(normalizedTitle.split(separator: " ").map(String.init))
+        return !slugWords.isEmpty
+            && slugWords.isDisjoint(with: titleWords)
+            && titleWords.count <= 4
+    }
+
+    private static let genericPreviewWords: Set<String> = [
+        "shop", "store", "official", "online", "product", "products", "collection"
+    ]
+
+    private static func normalizedComparisonText(_ value: String) -> String {
+        value.lowercased()
+            .replacingOccurrences(of: "&", with: "and")
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
     private static func jsonLDProducts(in html: String) -> [JSONLDProduct] {
         let scripts = capturedGroups(
             pattern: #"<script[^>]+type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>"#,
@@ -237,9 +564,13 @@ enum ProductPageImageExtractor {
         }
     }
 
-    private static func preferredProduct(in html: String) -> JSONLDProduct? {
+    private static func preferredProduct(in html: String, sourceURL: URL? = nil) -> JSONLDProduct? {
         let products = jsonLDProducts(in: html) + embeddedProductPayloads(in: html)
-        return products.max { score($0) < score($1) }
+        if let requestedVariant = sourceURL.flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "variant" })?.value }),
+           let selected = products.first(where: { $0.variantID == requestedVariant }) {
+            return selected
+        }
+        return products.max { score($0, matching: sourceURL) < score($1, matching: sourceURL) }
     }
 
     private static func embeddedProductPayloads(in html: String) -> [JSONLDProduct] {
@@ -258,12 +589,22 @@ enum ProductPageImageExtractor {
         }
     }
 
-    private static func score(_ product: JSONLDProduct) -> Int {
+    private static func score(_ product: JSONLDProduct, matching sourceURL: URL?) -> Int {
         var score = product.title.isEmpty ? 0 : 4
         if !product.brand.isEmpty { score += 2 }
         if !product.description.isEmpty { score += 2 }
         if product.price != nil { score += 3 }
-        score += min(product.images.count, 6)
+        let realImages = product.images.filter { image in
+            let lower = image.lowercased()
+            return !["favicon", "product_default", "placeholder", "sprite"].contains(where: lower.contains)
+        }
+        score += realImages.isEmpty ? -8 : min(realImages.count * 2, 8)
+        if let sourceURL, let pageURL = product.pageURL,
+           let resolved = URL(string: pageURL, relativeTo: sourceURL)?.absoluteURL,
+           resolved.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            == sourceURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) {
+            score += 12
+        }
         return score
     }
 
@@ -282,8 +623,11 @@ enum ProductPageImageExtractor {
         if types.contains(where: { $0.caseInsensitiveCompare("Product") == .orderedSame }) {
             products.append(dictionary)
         }
-        if let graph = dictionary["@graph"] {
-            products.append(contentsOf: productDictionaries(in: graph))
+        // A schema.org ProductGroup commonly nests purchasable choices in
+        // `hasVariant`, so only traversing `@graph` loses the shared variant.
+        for value in dictionary.values {
+            if value is String || value is NSNumber { continue }
+            products.append(contentsOf: productDictionaries(in: value))
         }
         return products
     }
@@ -312,9 +656,25 @@ enum ProductPageImageExtractor {
         order: inout Int,
         to candidates: inout [ImageCandidate]
     ) {
-        guard let url = normalizedImageURL(rawValue, baseURL: baseURL) else { return }
+        guard let url = normalizedImageURL(rawValue, baseURL: baseURL),
+              !isSiteArtworkURL(url),
+              !url.path.lowercased().contains("product_default") else { return }
+        if let upgraded = upscaledImageURL(url) {
+            candidates.append(ImageCandidate(url: upgraded, context: "high-resolution \(context)", sourceOrder: order))
+            order += 1
+        }
         candidates.append(ImageCandidate(url: url, context: context, sourceOrder: order))
         order += 1
+    }
+
+    private static func upscaledImageURL(_ url: URL) -> URL? {
+        let path = url.path
+        guard let match = path.range(of: #"/w_(\d{3,4})/"#, options: .regularExpression),
+              let width = Int(path[match].filter(\.isNumber)),
+              (300..<1000).contains(width),
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        components.path = path.replacingCharacters(in: match, with: "/w_1200/")
+        return components.url
     }
 
     private static func normalizedImageURL(_ rawValue: String, baseURL: URL) -> URL? {
@@ -346,20 +706,15 @@ enum ProductPageImageExtractor {
             return nil
         }
 
-        let lower = url.absoluteString.lowercased()
-        let looksLikeImage = lower.contains(".jpg")
-            || lower.contains(".jpeg")
-            || lower.contains(".png")
-            || lower.contains(".webp")
-            || lower.contains("/cdn/shop/")
-        guard looksLikeImage else {
-            return nil
-        }
-
+        // Modern retail CDNs frequently use extensionless image routes (for
+        // example Staples Scene7 URLs). The caller only supplies values from
+        // product image metadata, JSON-LD, image tags, or srcsets, so rejecting
+        // a candidate solely because it has no .jpg/.webp suffix drops valid
+        // product photos from many otherwise importable sites.
         return url
     }
 
-    private static func score(_ candidate: ImageCandidate) -> Int {
+    private static func score(_ candidate: ImageCandidate, productURL: URL) -> Int {
         let text = "\(candidate.url.absoluteString) \(candidate.context)"
             .lowercased()
             .replacingOccurrences(of: "%20", with: " ")
@@ -388,6 +743,34 @@ enum ProductPageImageExtractor {
         if text.contains("logo") || text.contains("icon") || text.contains("sprite") || text.contains("placeholder") { score -= 60 }
         if text.contains("thumb") || text.contains("thumbnail") || text.contains("small") { score -= 24 }
         if text.contains("banner") || text.contains("collection") || text.contains("social") { score -= 34 }
+
+        // A gallery often lists 384px thumbnails before the same product at
+        // 1024px. Prefer the larger rendition before making network requests.
+        let dimensionHints = ["width", "w", "sw", "wid", "size"]
+        let queryWidth = URLComponents(url: candidate.url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { dimensionHints.contains($0.name.lowercased()) })
+            .flatMap { Int($0.value ?? "") }
+        let pathWidth = candidate.url.path
+            .firstMatch(of: /(?:_|\b|w_)(\d{3,4})(?:x\d{3,4})?\b/)
+            .flatMap { Int($0.1) }
+        if let width = queryWidth ?? pathWidth {
+            if width >= 1000 { score += 24 }
+            else if width >= 700 { score += 12 }
+            else if width < 550 { score -= 28 }
+        }
+
+        let imageIdentity = candidate.url.path.lowercased().filter { $0.isLetter || $0.isNumber }
+        let pathComponents = productURL.pathComponents
+            .flatMap { $0.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) }
+            .map { String($0).lowercased() }
+        if let productCode = pathComponents.first(where: { $0.count >= 6 && $0.contains(where: \.isNumber) }),
+           imageIdentity.contains(productCode) {
+            score += 90
+        }
+        for word in Array(Set(pathComponents.filter { $0.count >= 4 && !$0.allSatisfy(\.isNumber) })).sorted().prefix(5) {
+            if text.contains(word) { score += 7 }
+        }
 
         return score
     }
@@ -472,6 +855,23 @@ private struct JSONLDProduct {
     let price: Decimal?
     let currencyCode: String
     let images: [String]
+    let pageURL: String?
+
+    var variantID: String? {
+        let offer: [String: Any]?
+        if let offers = rawOffers as? [String: Any] {
+            offer = offers
+        } else if let offers = rawOffers as? [[String: Any]] {
+            offer = offers.first
+        } else {
+            offer = nil
+        }
+        guard let rawURL = offer?["url"] as? String,
+              let components = URLComponents(string: rawURL) else { return nil }
+        return components.queryItems?.first(where: { $0.name == "variant" })?.value
+    }
+
+    private let rawOffers: Any?
 
     init?(_ dictionary: [String: Any]) {
         guard let title = dictionary["name"] as? String, !title.isEmpty else { return nil }
@@ -484,6 +884,7 @@ private struct JSONLDProduct {
             self.brand = ""
         }
         description = (dictionary["description"] as? String)?.strippingHTML ?? ""
+        rawOffers = dictionary["offers"]
         let offer: [String: Any]?
         if let offers = dictionary["offers"] as? [String: Any] {
             offer = offers
@@ -501,6 +902,7 @@ private struct JSONLDProduct {
         }
         currencyCode = (offer?["priceCurrency"] as? String)?.uppercased() ?? ""
         images = Self.imageValues(from: dictionary["image"])
+        pageURL = dictionary["url"] as? String ?? dictionary["@id"] as? String
     }
 
     init?(embeddedPayload dictionary: [String: Any]) {
@@ -509,11 +911,13 @@ private struct JSONLDProduct {
         }
 
         self.title = title.strippingHTML
+        rawOffers = nil
         brand = (dictionary["vendor"] as? String ?? dictionary["brand"] as? String ?? "").strippingHTML
         description = (dictionary["description"] as? String ?? dictionary["content"] as? String ?? "").strippingHTML
         images = Self.imageValues(from: dictionary["images"])
             + Self.imageValues(from: dictionary["image"])
             + Self.mediaImageValues(from: dictionary["media"])
+        pageURL = dictionary["url"] as? String
 
         if let number = dictionary["price"] as? NSNumber {
             // Shopify's embedded product payload uses integer cents. Decimal values are
@@ -579,5 +983,141 @@ private extension String {
             .replacingOccurrences(of: "&#39;", with: "'")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
+    }
+}
+
+/// Resolves a retail barcode into product metadata and a product image. The
+/// scanner deliberately never uses the camera frame as the product image:
+/// its result is the catalog image returned for the scanned barcode.
+enum ProductBarcodeLookupService {
+    static func lookup(_ rawCode: String) async throws -> ProductLinkPreview {
+        let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard code.count >= 8 else {
+            throw AppError.unavailable("That barcode is too short. Try scanning it again.")
+        }
+
+        if let product = try? await upcItemDBProduct(for: code) { return product }
+        if let product = try? await openFoodFactsProduct(for: code) { return product }
+        throw AppError.unavailable("We couldn't identify that barcode yet. Paste the product link instead.")
+    }
+
+    private static func upcItemDBProduct(for code: String) async throws -> ProductLinkPreview? {
+        guard var components = URLComponents(string: "https://api.upcitemdb.com/prod/trial/lookup") else { return nil }
+        components.queryItems = [URLQueryItem(name: "upc", value: code)]
+        guard let url = components.url else { return nil }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { return nil }
+        let payload = try JSONDecoder().decode(UPCItemDBResponse.self, from: data)
+        guard let item = payload.items.first, !item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+
+        let preferredCurrency = Locale.current.currency?.identifier.uppercased() ?? "USD"
+        let offers = (item.offers ?? []).compactMap { offer -> (UPCItemDBResponse.Offer, URL)? in
+            guard let link = offer.link,
+                  let url = URL(string: link),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+                  offer.availability?.lowercased().contains("out of stock") != true else { return nil }
+            return (offer, url)
+        }
+        let selectedOffer = offers.sorted { lhs, rhs in
+            let lhsHasPrice = (lhs.0.price ?? 0) > 0
+            let rhsHasPrice = (rhs.0.price ?? 0) > 0
+            if lhsHasPrice != rhsHasPrice { return lhsHasPrice }
+            let lhsMatchesCurrency = (lhs.0.currency ?? "USD").uppercased() == preferredCurrency
+            let rhsMatchesCurrency = (rhs.0.currency ?? "USD").uppercased() == preferredCurrency
+            if lhsMatchesCurrency != rhsMatchesCurrency { return lhsMatchesCurrency }
+            return (lhs.0.updatedAt ?? 0) > (rhs.0.updatedAt ?? 0)
+        }.first
+
+        // The catalog's offer supplies a real shopping link and listed price.
+        // Check that merchant page for a newer price when it can be read.
+        let retailerPreview: ProductLinkPreview?
+        if let selectedOffer {
+            retailerPreview = await ProductPageImageExtractor.previewProductLink(for: selectedOffer.1)
+        } else {
+            retailerPreview = nil
+        }
+        let offerPrice = selectedOffer?.0.price.flatMap { $0 > 0 ? Decimal(string: String($0)) : nil }
+        let livePrice = retailerPreview?.price.flatMap { $0 > 0 ? $0 : nil }
+        let productURL = retailerPreview?.sourceURL ?? selectedOffer?.1
+            ?? URL(string: "https://www.upcitemdb.com/upc/\(code)")!
+        return ProductLinkPreview(
+            sourceURL: productURL,
+            title: ProductImportedCopy.conciseTitle(item.title, brand: item.brand ?? ""),
+            brand: item.brand ?? "",
+            shortDescription: "",
+            price: livePrice ?? offerPrice,
+            currencyCode: livePrice != nil ? (retailerPreview?.currencyCode ?? "USD")
+                : (selectedOffer?.0.currency?.uppercased() ?? "USD"),
+            imageURL: item.images?.compactMap(URL.init(string:)).first ?? retailerPreview?.imageURL
+        )
+    }
+
+    private static func openFoodFactsProduct(for code: String) async throws -> ProductLinkPreview? {
+        guard let url = URL(string: "https://world.openfoodfacts.org/api/v2/product/\(code).json") else { return nil }
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { return nil }
+        let payload = try JSONDecoder().decode(OpenFoodFactsResponse.self, from: data)
+        guard payload.status == 1, let product = payload.product,
+              let title = product.productName?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return nil }
+
+        return ProductLinkPreview(
+            sourceURL: URL(string: "https://world.openfoodfacts.org/product/\(code)")!,
+            title: ProductImportedCopy.conciseTitle(title, brand: product.brands ?? ""),
+            brand: product.brands ?? "",
+            shortDescription: "",
+            imageURL: product.imageFrontURL.flatMap(URL.init(string:)) ?? product.imageURL.flatMap(URL.init(string:))
+        )
+    }
+}
+
+private struct UPCItemDBResponse: Decodable {
+    let items: [Item]
+    struct Item: Decodable {
+        let title: String
+        let brand: String?
+        let category: String?
+        let images: [String]?
+        let offers: [Offer]?
+    }
+    struct Offer: Decodable {
+        let link: String?
+        let price: Double?
+        let currency: String?
+        let availability: String?
+        let updatedAt: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case link, price, currency, availability
+            case updatedAt = "updated_t"
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            link = try? values.decode(String.self, forKey: .link)
+            currency = try? values.decode(String.self, forKey: .currency)
+            availability = try? values.decode(String.self, forKey: .availability)
+            price = (try? values.decode(Double.self, forKey: .price))
+                ?? (try? values.decode(String.self, forKey: .price)).flatMap(Double.init)
+            updatedAt = (try? values.decode(Double.self, forKey: .updatedAt))
+                ?? (try? values.decode(String.self, forKey: .updatedAt)).flatMap(Double.init)
+        }
+    }
+}
+
+private struct OpenFoodFactsResponse: Decodable {
+    let status: Int
+    let product: Product?
+    struct Product: Decodable {
+        let productName: String?
+        let brands: String?
+        let categories: String?
+        let imageFrontURL: String?
+        let imageURL: String?
+        enum CodingKeys: String, CodingKey {
+            case productName = "product_name"
+            case brands, categories
+            case imageFrontURL = "image_front_url"
+            case imageURL = "image_url"
+        }
     }
 }

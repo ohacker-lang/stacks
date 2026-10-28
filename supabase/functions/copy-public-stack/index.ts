@@ -9,7 +9,6 @@ type SourceStack = {
   id: string;
   owner_id: string;
   title: string;
-  summary: string;
   wishlist_mode: boolean;
 };
 
@@ -62,7 +61,6 @@ serve(async (req) => {
       id: destinationID,
       owner_id: context.user.id,
       title,
-      summary: source.stack.summary,
       visibility: "private",
       wishlist_mode: source.stack.wishlist_mode,
       copied_from_stack_id: source.stack.id,
@@ -115,7 +113,7 @@ serve(async (req) => {
 async function loadSource(client: ReturnType<typeof serviceClient>, stackID: string, linkToken: string): Promise<{ stack: SourceStack; items: SourceItem[] } | null> {
   const { data: publicStack, error: publicError } = await client
     .from("stacks")
-    .select("id, owner_id, title, summary, wishlist_mode, visibility")
+    .select("id, owner_id, title, wishlist_mode, visibility")
     .eq("id", stackID)
     .in("visibility", ["public"])
     .maybeSingle();

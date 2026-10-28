@@ -12,6 +12,7 @@ struct AppServices: @unchecked Sendable {
     let collaboration: any CollaborationService
     let storage: any StorageService
     let realtime: any RealtimeService
+    let safety: any SafetyService
     let haptics: HapticsService
 
     static func mock() -> AppServices {
@@ -28,6 +29,7 @@ struct AppServices: @unchecked Sendable {
             collaboration: MockCollaborationService(seed: seed),
             storage: MockStorageService(),
             realtime: MockRealtimeService(),
+            safety: MockSafetyService(),
             haptics: HapticsService()
         )
     }
@@ -42,11 +44,12 @@ struct AppServices: @unchecked Sendable {
             profiles: SupabaseProfileRepository(configuration: configuration),
             productSearch: EdgeFunctionProductSearchService(),
             backgroundRemoval: AppleVisionBackgroundRemovalService(),
-            affiliate: EdgeFunctionAffiliateService(),
-            claims: EdgeFunctionClaimService(),
-            collaboration: SupabaseCollaborationService(),
+            affiliate: EdgeFunctionAffiliateService(configuration: configuration),
+            claims: EdgeFunctionClaimService(configuration: configuration),
+            collaboration: SupabaseCollaborationService(configuration: configuration),
             storage: SupabaseStorageService(),
             realtime: SupabaseRealtimeService(),
+            safety: SupabaseSafetyService(configuration: configuration),
             haptics: HapticsService()
         )
     }
@@ -55,7 +58,17 @@ struct AppServices: @unchecked Sendable {
     /// the Supabase URL and anon key. This keeps local previews usable before
     /// production credentials are installed.
     static func configured() -> AppServices {
-        SupabaseConfiguration.fromAppBundle() == nil ? mock() : supabaseBackedPlaceholder()
+        #if STACKS_PERSONAL_TEAM_DEMO
+        // Free Personal Teams cannot provision Sign in with Apple or App
+        // Groups. The Debug configuration therefore runs a self-contained
+        // local account while Release remains fully production-backed.
+        return mock()
+        #else
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["STACKS_PRO_LOCAL_STOREKIT"] == "1" { return mock() }
+        #endif
+        return SupabaseConfiguration.fromAppBundle() == nil ? mock() : supabaseBackedPlaceholder()
+        #endif
     }
 }
 

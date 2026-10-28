@@ -9,21 +9,26 @@ final class HomeViewModel {
     var isLoading = false
     var errorMessage: String?
     var createTitle = ""
-    var createWishlistMode = false
+    var createWishlistMode = true
+    var createVisibility: StackVisibility = .private
 
     func load(services: AppServices, user: UserProfile) async {
         isLoading = true
         defer { isLoading = false }
+        async let fetchedStacks = services.stacks.fetchMyStacks(for: user.id)
+        async let discoveredStacks = services.stacks.fetchDiscoverStacks(query: nil)
         do {
-            async let fetchedStacks = services.stacks.fetchMyStacks(for: user.id)
-            async let discoveredStacks = services.stacks.fetchDiscoverStacks(query: nil)
-
-            let (myStacks, discoverStacks) = try await (fetchedStacks, discoveredStacks)
-            self.myStacks = myStacks.sorted { $0.updatedAt > $1.updatedAt }
-            self.discoverStacks = discoverStacks.sorted { $0.updatedAt > $1.updatedAt }
+            let owned = try await fetchedStacks
+            myStacks = owned.sorted { $0.updatedAt > $1.updatedAt }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+        do {
+            let discovered = try await discoveredStacks
+            discoverStacks = discovered.sorted { $0.updatedAt > $1.updatedAt }
+        } catch {
+            if errorMessage == nil { errorMessage = error.localizedDescription }
         }
     }
 
@@ -32,11 +37,24 @@ final class HomeViewModel {
             let stack = try await services.stacks.createStack(
                 title: createTitle.isEmpty ? "Untitled Stack" : createTitle,
                 wishlistMode: createWishlistMode,
+                visibility: createVisibility,
                 owner: user
             )
             myStacks.insert(stack, at: 0)
+            SharedStackDestinationStore.upsert(
+                SharedStackDestination(
+                    id: stack.id,
+                    title: stack.displayTitle,
+                    ownerName: user.displayName,
+                    avatarURL: user.avatarURL,
+                    updatedAt: stack.updatedAt
+                ),
+                for: user.id
+            )
+            NotificationCenter.default.post(name: .stacksShareDestinationsDidChange, object: nil)
             createTitle = ""
-            createWishlistMode = false
+            createWishlistMode = true
+            createVisibility = .private
             services.haptics.notification(.success)
             return stack
         } catch {
@@ -45,4 +63,5 @@ final class HomeViewModel {
             return nil
         }
     }
+
 }

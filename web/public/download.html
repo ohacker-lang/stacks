@@ -4,14 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="Get Stacks for iPhone when it launches. Explore public Stacks in your browser today.">
-  <title>Download Stacks</title>
+  <meta name="description" content="Claim your Stacks username and join the iPhone app waitlist.">
+  <title>Claim your username · Stacks</title>
   <link rel="icon" type="image/png" href="/assets/stacks-logo.png">
   <link rel="stylesheet" href="/site.css">
+  <script src="/waitlist.js" defer></script>
 </head>
 <body class="download-page">
-  <header class="site-header"><nav class="nav-pill" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><a href="/download" aria-current="page">Download</a><a href="/stacks">Explore</a></nav></header>
-  <main class="download-main"><img class="brand-mark" src="/assets/stacks-logo.png" alt="" aria-hidden="true"><p class="eyebrow">Stacks for iPhone</p><h1>Your next find has a place.</h1><p>We’re getting Stacks ready for the App Store. The download link will appear here when it’s available. Until then, you can explore public Stacks in your browser.</p><a class="button" href="/stacks">Explore public Stacks ↗</a><a class="download-demo-link" href="/demo/beanies">Try the Beanies demo</a></main>
+  <header class="site-header"><nav class="nav-pill" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><a href="/waitlist" aria-current="page">Waitlist</a><a href="/stacks">Explore</a></nav></header>
+  <main class="download-main waitlist-main">
+    <img class="brand-mark" src="/assets/stacks-logo.png" alt="" aria-hidden="true">
+    <p class="eyebrow">Stacks for iPhone</p>
+    <h1>Claim your username.</h1>
+    <p>Choose your name, then add your email to save your spot on the waitlist.</p>
+    <form id="waitlist-form" class="waitlist-form" novalidate>
+      <label for="waitlist-username">Your username</label>
+      <div class="waitlist-input-wrap"><span aria-hidden="true">@</span><input id="waitlist-username" name="username" type="text" inputmode="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="30" pattern="[A-Za-z0-9_]{3,30}" placeholder="yourname" required></div>
+      <p class="waitlist-hint">3–30 letters, numbers, or underscores.</p>
+      <button class="button waitlist-button" id="waitlist-check" type="button">Check username <span aria-hidden="true">↗</span></button>
+      <div id="waitlist-email-step" class="waitlist-email-step" hidden>
+        <label for="waitlist-email">Email address</label>
+        <input id="waitlist-email" name="email" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com" required>
+        <input name="company" class="waitlist-trap" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="button waitlist-button" id="waitlist-submit" type="submit">Save my spot <span aria-hidden="true">↗</span></button>
+      </div>
+      <p class="waitlist-status" id="waitlist-status" role="status" aria-live="polite"></p>
+    </form>
+    <div class="waitlist-success" id="waitlist-success" hidden><h2>You're on the list.</h2><p id="waitlist-success-copy"></p><a class="button" href="/demo/beanies">Explore a Stack ↗</a></div>
+    <p class="waitlist-privacy">We'll use your email for the waitlist and launch updates, not unrelated marketing. Email ownership may be checked before your username is connected to an app account. <a href="/privacy">Privacy</a></p>
+  </main>
   <footer class="site-footer"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><nav aria-label="Footer"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a></nav><small>© 2026 Stacks</small></footer>
 </body>
 </html>

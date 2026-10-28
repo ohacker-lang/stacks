@@ -81,10 +81,10 @@ pins, follows, wishlist claims, and copying shared Stacks safely.
   Stack owner's media namespace.
 - Secure public/link-only Stack copying through `copy-public-stack`. It creates
   a private copy and duplicates media into the new owner's Storage namespace.
-- A deployed `web-preview` endpoint that intentionally returns `501` until the
-  read-only web product is built; its security contract is versioned now so it
-  can be enabled without exposing share tokens, claims, collaborators, or
-  analytics.
+- A `web-preview` Edge Function for public and link-only Stack viewing. Browser
+  requests render the Stack layout and email-verified wishlist claims; JSON
+  requests receive a scoped preview. The updated function must be tested and
+  deployed before these browser share URLs are considered live.
 - Development-only seed data and RLS smoke tests in `supabase/seed.sql` and
   `supabase/tests/rls_access.sql`.
 - Live client service wiring for Keychain-persisted Supabase sessions, refresh,
@@ -106,7 +106,8 @@ pins, follows, wishlist claims, and copying shared Stacks safely.
 - Add provider credentials and production behavior: SerpApi search, a robust
   merchant parser/image-ranking fallback, a server removal fallback only if
   needed, and Sovrn wrapping for commissionable Buy links.
-- Build the read-only web preview before publishing browser share links.
+- Configure the public legal/support pages and deploy `web-preview` before
+  publishing browser share links. See `docs/APP_STORE_RELEASE.md`.
 - Configure Sign in with Apple, email OTP, production secrets, separate
   development/staging/production Supabase projects, and monitoring/rate limits.
 - Finalize the Privacy Policy, Terms of Service, support contact, account

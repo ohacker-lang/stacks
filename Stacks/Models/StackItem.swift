@@ -6,6 +6,10 @@ struct StackItem: Identifiable, Codable, Hashable, Sendable {
     var title: String
     var brand: String
     var shortDescription: String
+    /// Imported copy is intentionally kept to one sentence. A value of `true`
+    /// means the member deliberately wrote or expanded this description and it
+    /// should be presented in full.
+    var isDescriptionUserAuthored: Bool? = nil
     var price: Decimal
     var currencyCode: String
     var sourceURL: URL
@@ -24,7 +28,10 @@ struct StackItem: Identifiable, Codable, Hashable, Sendable {
     var isBookmarked: Bool? = nil
 
     var purchaseURL: URL {
-        affiliateURL ?? buyURL
+        // Stored affiliate URLs can become ineligible when a Stack is viewed
+        // from another country. Only the Buy screen resolves a fresh,
+        // disclosed commissionable destination for the current viewer.
+        buyURL
     }
 
     /// Manual photo imports may be saved before the person knows where the
@@ -43,6 +50,7 @@ struct StackItem: Identifiable, Codable, Hashable, Sendable {
     }
 
     var formattedPrice: String {
+        guard price > 0 else { return "—" }
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = currencyCode
@@ -82,7 +90,7 @@ enum AddItemSource: String, Codable, CaseIterable, Hashable, Sendable {
         switch self {
         case .search: "Search"
         case .pastedLink: "Paste Link"
-        case .camera: "Take Picture"
+        case .camera: "Scan Barcode"
         case .photoLibrary: "Camera Roll"
         case .manualPhoto: "Add Manually"
         }

@@ -1,0 +1,56 @@
+{
+  "appPolicies": { "eula": "", "policies": [] },
+  "identifier": "535441434B5350524F",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "53544143",
+      "localizations": [],
+      "name": "Stacks Pro",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "2.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "53544144",
+          "localizations": [{ "description": "Price alerts, unlimited saves, and expanded Collabs", "displayName": "Stacks Pro Monthly", "locale": "en_US" }],
+          "productID": "stacks.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Stacks Pro Monthly",
+          "subscriptionGroupID": "53544143",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "14.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "53544146",
+          "introductoryOffer": {
+            "internalID": "53544147",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
+          },
+          "localizations": [{ "description": "Price alerts, unlimited saves, and expanded Collabs", "displayName": "Stacks Pro Annual", "locale": "en_US" }],
+          "productID": "stacks.pro.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Stacks Pro Annual",
+          "subscriptionGroupID": "53544143",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": { "major": 4, "minor": 0 }
+}

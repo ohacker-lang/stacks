@@ -1,5 +1,10 @@
 import Foundation
 
+extension Notification.Name {
+    static let stacksCollaborationDidChange = Notification.Name("stacks.collaboration.didChange")
+    static let stacksShareDestinationsDidChange = Notification.Name("stacks.shareDestinations.didChange")
+}
+
 struct StackBookmark: Identifiable, Codable, Hashable, Sendable {
     let id: UUID
     var stackID: UUID
@@ -51,3 +56,25 @@ enum CollaboratorPermission: String, Codable, CaseIterable, Hashable, Sendable {
     case owner
 }
 
+struct CollaborationInvite: Identifiable, Hashable, Sendable {
+    let id: UUID
+    let stackID: UUID
+    let token: UUID
+    let permission: CollaboratorPermission
+    let expiresAt: Date
+
+    var deepLink: URL? {
+        URL(string: "https://stacks.spot/invite/\(token.uuidString)")
+    }
+}
+
+struct CollaborationInvitePreview: Identifiable, Hashable, Sendable {
+    let token: UUID
+    let stackID: UUID
+    let stackTitle: String
+    let owner: UserProfile
+    let permission: CollaboratorPermission
+    let expiresAt: Date
+
+    var id: UUID { token }
+}

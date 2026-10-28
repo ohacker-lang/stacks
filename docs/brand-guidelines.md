@@ -55,7 +55,7 @@ Use two families only.
 
 - Use sentence case: `Summer fits`, never forced uppercase.
 - Keep tracking at `0` for normal SF Pro text. The only exception is the Stack masthead token above.
-- Never use a serif for a functional label, product detail, button, navigation, or Stack description.
+- Never use a serif for a functional label, product detail, button, or navigation.
 - Do not use SF Pro Rounded or custom display fonts outside Instrument Serif on onboarding.
 - Prefer short copy. One strong phrase beats a paragraph of product language.
 
@@ -82,7 +82,7 @@ Use stable dimensions for controls. Do not let labels change a button’s visual
 - Use the reusable `StackTitle` flush to the 16 pt content grid, near the top of the page.
 - Put product cutouts immediately below the masthead. Avoid a large empty band between the title and products.
 - Owners see a simple `+` for adding products. Visitors see an ellipsis menu for Share and Copy Stack.
-- Do not show a Stack description in the current product experience. The title and objects are the story.
+- Stacks have titles and objects, not descriptions.
 
 ### Product cutouts
 

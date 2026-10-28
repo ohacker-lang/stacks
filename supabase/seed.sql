@@ -70,14 +70,13 @@ where id in (
 );
 
 insert into public.stacks (
-  id, owner_id, title, summary, visibility, wishlist_mode, public_link_token
+  id, owner_id, title, visibility, wishlist_mode, public_link_token
 )
 values
   (
     '30000000-0000-4000-8000-000000000001',
     '10000000-0000-4000-8000-000000000001',
     'Desk Dreams',
-    'Objects for a quieter desk.',
     'private',
     false,
     '40000000-0000-4000-8000-000000000001'
@@ -86,7 +85,6 @@ values
     '30000000-0000-4000-8000-000000000002',
     '20000000-0000-4000-8000-000000000002',
     'Summer',
-    'Things I am keeping close this season.',
     'public',
     false,
     '40000000-0000-4000-8000-000000000002'
@@ -95,7 +93,6 @@ values
     '30000000-0000-4000-8000-000000000003',
     '20000000-0000-4000-8000-000000000002',
     'Birthday Wishes',
-    'A link-only wishlist for friends.',
     'link_only',
     true,
     '40000000-0000-4000-8000-000000000003'
@@ -111,6 +108,10 @@ values (
   now()
 )
 on conflict (stack_id, user_id) do nothing;
+
+update public.stacks
+set collaboration_enabled = true
+where id = '30000000-0000-4000-8000-000000000001';
 
 insert into public.stack_items (
   id, stack_id, title, brand, description, price, currency_code, source_url,

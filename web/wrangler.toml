@@ -2,6 +2,13 @@ name = "stacks-site"
 main = "src/index.js"
 compatibility_date = "2025-09-27"
 
+[triggers]
+crons = ["17 * * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [[routes]]
 pattern = "stacks.spot"
 custom_domain = true
@@ -14,3 +21,8 @@ custom_domain = true
 directory = "./public"
 binding = "ASSETS"
 run_worker_first = true
+
+[vars]
+SUPABASE_URL = "https://iuovmgjcfwgwozfnsdgf.supabase.co"
+# This is the public client key also embedded in the iOS app, not a service-role key.
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_hD4djOAlXSKPZHDqLh90zg_147MUcM7"

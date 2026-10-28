@@ -69,7 +69,7 @@ final class StackDetailViewModel {
                 currencyCode: "USD",
                 sourceURL: url,
                 buyURL: url,
-                affiliateURL: try? await services.affiliate.affiliateURL(for: url),
+                affiliateURL: nil,
                 originalImageURL: uploadedURL,
                 removedBackgroundImageURL: nil,
                 removalStatus: .processing,
@@ -122,6 +122,114 @@ final class StackDetailViewModel {
         }
     }
 
+    func updateSettings(
+        title: String,
+        visibility: StackVisibility,
+        wishlistMode: Bool,
+        services: AppServices
+    ) async {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else {
+            errorMessage = AppError.missingRequiredField("Stack name").localizedDescription
+            return
+        }
+
+        var updated = stack
+        updated.title = cleanTitle
+        updated.visibility = visibility
+        updated.wishlistMode = wishlistMode
+
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            stack = try await services.stacks.updateStack(updated)
+            NotificationCenter.default.post(name: .stacksShareDestinationsDidChange, object: nil)
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func rotateWishlistLink(revoke: Bool, services: AppServices) async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            stack = try await services.stacks.rotateWishlistLink(stackID: stack.id, revoke: revoke)
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func refresh(services: AppServices, userID: UUID) async {
+        guard !isSaving else { return }
+        do {
+            stack = try await services.stacks.fetchStack(id: stack.id, for: userID)
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func setCollaborationEnabled(_ enabled: Bool, services: AppServices, userID: UUID) async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await services.collaboration.setCollaborationEnabled(stackID: stack.id, enabled: enabled)
+            stack = try await services.stacks.fetchStack(id: stack.id, for: userID)
+            NotificationCenter.default.post(name: .stacksCollaborationDidChange, object: stack.id)
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func removeCollaborator(userID collaboratorID: UUID, services: AppServices, viewerID: UUID) async {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await services.collaboration.removeCollaborator(stackID: stack.id, userID: collaboratorID)
+            stack = try await services.stacks.fetchStack(id: stack.id, for: viewerID)
+            NotificationCenter.default.post(name: .stacksCollaborationDidChange, object: stack.id)
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func leaveCollaboration(services: AppServices) async -> Bool {
+        do {
+            try await services.collaboration.leaveStack(stackID: stack.id)
+            NotificationCenter.default.post(name: .stacksCollaborationDidChange, object: stack.id)
+            services.haptics.notification(.success)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+            return false
+        }
+    }
+
+    func deleteStack(services: AppServices) async -> Bool {
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await services.stacks.deleteStack(id: stack.id)
+            NotificationCenter.default.post(name: .stacksShareDestinationsDidChange, object: nil)
+            services.haptics.notification(.success)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+            return false
+        }
+    }
+
     func updatePlacement(
         for itemID: UUID,
         placement: StickerPlacement,
@@ -171,6 +279,16 @@ final class StackDetailViewModel {
             if removingOriginal {
                 stack = try await services.stacks.removeItem(id: itemID, from: stack.id)
             }
+            services.haptics.notification(.success)
+        } catch {
+            errorMessage = error.localizedDescription
+            services.haptics.notification(.error)
+        }
+    }
+
+    func removeItem(itemID: UUID, services: AppServices) async {
+        do {
+            stack = try await services.stacks.removeItem(id: itemID, from: stack.id)
             services.haptics.notification(.success)
         } catch {
             errorMessage = error.localizedDescription

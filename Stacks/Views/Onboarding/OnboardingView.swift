@@ -1,17 +1,47 @@
 import SwiftUI
 import UIKit
 import CoreMotion
+import Contacts
+
+private enum OnboardingKeyboard {
+    @MainActor
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
 
 private enum OnboardingStage: Equatable {
     case hero
     case stackIt
+    case saveAnywhere
     case shareIt
+    case friends
+    case cameraReveal
     case firstStack
 }
 
+private struct OnboardingContactPreview: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let imageData: Data?
+}
+
 private enum FirstStackStep: Equatable {
+    case purpose
     case name
-    case readiness
+    case addProduct
+}
+
+private enum FirstStackPurpose: Equatable {
+    case inspiration
+    case wishlist
+
+    var isWishlist: Bool { self == .wishlist }
 }
 
 private enum OnboardingSheet: Identifiable {
@@ -38,12 +68,16 @@ private enum FirstItemImportSheet: Identifiable {
 
 struct OnboardingView: View {
     @Environment(AppSession.self) private var session
+    @Environment(StacksPro.self) private var pro
     @Environment(\.appServices) private var services
     @State private var stage: OnboardingStage = {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-preview-onboarding-stickers") {
             .stackIt
-        } else if ProcessInfo.processInfo.arguments.contains("-preview-first-stack-name") {
+        } else if ProcessInfo.processInfo.arguments.contains("-preview-save-anywhere") {
+            .saveAnywhere
+        } else if ProcessInfo.processInfo.arguments.contains("-preview-first-stack-name")
+                    || ProcessInfo.processInfo.arguments.contains("-preview-first-stack-purpose") {
             .firstStack
         } else {
             .hero
@@ -61,8 +95,16 @@ struct OnboardingView: View {
     }()
     @State private var firstStackTitle = ""
     @State private var heroWord = "things"
-    @State private var firstStackStep: FirstStackStep = .name
+    @State private var firstStackStep: FirstStackStep = {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-preview-first-stack-name") ? .name : .purpose
+        #else
+        .purpose
+        #endif
+    }()
+    @State private var firstStackPurpose: FirstStackPurpose = .inspiration
     @State private var firstItemImageData: Data?
+    @State private var firstItemLinkPreview: ProductLinkPreview?
     @State private var onboardingProfile: UserProfile?
     @State private var firstItemImportSheet: FirstItemImportSheet?
     @State private var isShowingFirstItemCamera = false
@@ -71,6 +113,10 @@ struct OnboardingView: View {
     @State private var firstItemImportError: String?
     @State private var isAuthenticating = false
     @State private var isShowingEmailCheckAlert = false
+    @State private var isShowingProPaywall = false
+    @State private var contactsAuthorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
+    @State private var contactPreviews: [OnboardingContactPreview] = []
+    @State private var isRequestingContacts = false
     @State private var burstMultiplier = 1
     @State private var burstID = 0
     @Namespace private var firstStackCanvasNamespace
@@ -79,39 +125,58 @@ struct OnboardingView: View {
         ZStack {
             Color.white.ignoresSafeArea()
 
-            switch stage {
-            case .hero:
-                hero
-            case .stackIt:
-                PhysicsExplainerScreen(
-                    title: "Stack your finds",
-                    assets: .stacking,
-                    burstMultiplier: burstMultiplier,
-                    burstID: burstID,
-                    primaryTitle: "Next",
-                    onPrimary: advanceToShareIt,
-                    onSkip: completeOnboarding
-                )
-            case .shareIt:
-                PhysicsExplainerScreen(
-                    title: "Share your taste",
-                    assets: .sharing,
-                    burstMultiplier: burstMultiplier,
-                    burstID: burstID,
-                    primaryTitle: "Make your first Stack",
-                    showsSharedStackPreview: true,
-                    onPrimary: advanceToFirstStack,
-                    onSkip: completeOnboarding
-                )
-            case .firstStack:
-                firstStackPrompt
+            Group {
+                switch stage {
+                case .hero:
+                    hero
+                case .stackIt:
+                    PhysicsExplainerScreen(
+                        title: "Stack your finds",
+                        assets: .stacking,
+                        burstMultiplier: burstMultiplier,
+                        burstID: burstID,
+                        primaryTitle: "Next",
+                        onPrimary: advanceToSaveAnywhere,
+                        onSkip: completeOnboarding
+                    )
+                case .saveAnywhere:
+                    SaveFromAnywhereVisual(onComplete: advanceToShareIt)
+                        .transition(.opacity)
+                case .shareIt:
+                    PhysicsExplainerScreen(
+                        title: "Share your taste",
+                        assets: .sharing,
+                        burstMultiplier: burstMultiplier,
+                        burstID: burstID,
+                        primaryTitle: "Next",
+                        showsSharedStackPreview: true,
+                        onPrimary: advanceToFirstStack,
+                        onSkip: completeOnboarding
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                case .friends:
+                    FriendsContactsScreen(
+                        contacts: contactPreviews,
+                        authorizationStatus: contactsAuthorizationStatus,
+                        isRequesting: isRequestingContacts,
+                        onAllow: requestContactsAccess,
+                        onContinue: completeOnboarding
+                    )
+                case .cameraReveal:
+                    Color.white.ignoresSafeArea()
+                case .firstStack:
+                    firstStackPrompt
+                }
             }
+            .frame(maxWidth: 430, maxHeight: 932)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if isShowingFirstItemCamera {
-                ProductCameraCaptureView(
-                    onCapture: { data in
+                BarcodeProductScannerView(
+                    showsMoreWaysHint: true,
+                    onProduct: { preview in
                         isShowingFirstItemCamera = false
-                        openFirstItemImport(.photo, imageData: data)
+                        openFirstItemImport(.link, linkPreview: preview)
                     },
                     onPasteLink: {
                         isShowingFirstItemCamera = false
@@ -122,11 +187,10 @@ struct OnboardingView: View {
                         isShowingFirstItemPhotoLibrary = true
                     },
                     onCancel: {
-                        isShowingFirstItemCamera = false
-                    },
-                    onboardingHint: "Other ways to add"
+                        skipFirstItemImport()
+                    }
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .transition(.opacity.combined(with: .scale(scale: 0.985)))
                 .zIndex(2)
             }
         }
@@ -134,7 +198,10 @@ struct OnboardingView: View {
             switch destination {
             case .email:
                 EmailSignInSheet(onSubmit: { email in
-                    let didSignIn = await session.signInWithEmail(email)
+                    let didSignIn = await session.signInWithEmail(
+                        email,
+                        acceptingLegalTerms: true
+                    )
                     if didSignIn {
                         if session.pendingEmailSignIn {
                             isShowingEmailCheckAlert = true
@@ -149,6 +216,9 @@ struct OnboardingView: View {
                 .presentationCornerRadius(30)
                 .presentationBackground(.ultraThinMaterial)
             }
+        }
+        .fullScreenCover(isPresented: $isShowingProPaywall, onDismiss: finishOnboarding) {
+            StacksProPaywall()
         }
         .alert("Check your email", isPresented: $isShowingEmailCheckAlert) {
             Button("OK", role: .cancel) {}
@@ -188,9 +258,12 @@ struct OnboardingView: View {
                         switch importSheet {
                         case .link:
                             ProductLinkImportSheet(
+                                initialPreview: firstItemLinkPreview,
                                 user: onboardingProfile,
                                 locksDestination: true,
                                 initialNewStackTitle: resolvedFirstStackTitle,
+                                initialNewStackWishlistMode: firstStackPurpose.isWishlist,
+                                onCancel: returnToFirstItemScanner,
                                 onSaved: finishFirstItemImport
                             )
                         case .photo:
@@ -200,6 +273,8 @@ struct OnboardingView: View {
                                 user: onboardingProfile,
                                 locksDestination: true,
                                 initialNewStackTitle: resolvedFirstStackTitle,
+                                initialNewStackWishlistMode: firstStackPurpose.isWishlist,
+                                onCancel: returnToFirstItemScanner,
                                 onSaved: finishFirstItemImport
                             )
                         }
@@ -239,6 +314,10 @@ struct OnboardingView: View {
         } message: {
             Text(firstItemImportError ?? "Please try again.")
         }
+        .task(id: stage) {
+            guard stage == .friends else { return }
+            refreshContactAuthorization()
+        }
     }
 
     private var hero: some View {
@@ -247,7 +326,15 @@ struct OnboardingView: View {
             let heroScale = min(1, max(0.88, proxy.size.height / 852))
             let titleSize = min((isCompact ? 48 : 54) * heroScale, proxy.size.width * 0.142)
             let titleHeight = (isCompact ? 98 : 108) * heroScale
-            let productHeight = min(max(proxy.size.height * 0.50, 340), isCompact ? 366 : 410)
+            // Reserve the sign-in area first so the cutout field never sits
+            // underneath the buttons on shorter phones.
+            let ctaReservedHeight: CGFloat = isCompact ? 242 : 228
+            let availableProductHeight = proxy.size.height
+                - proxy.safeAreaInsets.top
+                - titleHeight
+                - ctaReservedHeight
+                - 12
+            let productHeight = min(max(availableProductHeight, 250), isCompact ? 330 : 410)
             let ctaBottomInset = max(isCompact ? 22 : 26, proxy.safeAreaInsets.bottom + 12)
 
             ZStack(alignment: .bottom) {
@@ -286,13 +373,48 @@ struct OnboardingView: View {
                         services.haptics.impact(.medium)
                         isAuthenticating = true
                         Task {
-                            let didSignIn = await session.signInWithApple()
+                            let didSignIn = await session.signInWithApple(
+                                acceptingLegalTerms: true
+                            )
                             isAuthenticating = false
                             if didSignIn {
                                 advanceToStackIt()
                             }
                         }
                     }
+                    .disabled(isAuthenticating)
+
+                    Button {
+                        guard !isAuthenticating else { return }
+                        services.haptics.impact(.medium)
+                        isAuthenticating = true
+                        Task {
+                            let didSignIn = await session.signInWithGoogle(
+                                acceptingLegalTerms: true
+                            )
+                            isAuthenticating = false
+                            if didSignIn {
+                                advanceToStackIt()
+                            }
+                        }
+                    } label: {
+                        if isAuthenticating {
+                            ProgressView()
+                                .tint(Color.stacksInk)
+                                .frame(height: 58)
+                        } else {
+                            // Google's iOS-provided, pre-approved light pill.
+                            // Keeping the supplied asset intact preserves the
+                            // required multicolor G, font, border, and spacing.
+                            Image("GoogleSignInButton")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 58)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .disabled(isAuthenticating)
 
                     Button("Continue with email") {
                         guard !isAuthenticating else { return }
@@ -303,6 +425,8 @@ struct OnboardingView: View {
                     .font(.stacksText(size: 14, weight: .regular))
                     .foregroundStyle(Color.stacksMutedInk)
                     .disabled(isAuthenticating)
+
+                    LegalAgreementNotice()
                 }
                 .padding(.horizontal, isCompact ? 24 : 28)
                 .padding(.bottom, ctaBottomInset)
@@ -343,70 +467,42 @@ struct OnboardingView: View {
 
     private var firstStackPrompt: some View {
         GeometryReader { proxy in
-            if firstStackStep == .name {
+            switch firstStackStep {
+            case .name:
                 FirstStackNameQuestion(
                     title: $firstStackTitle,
                     namespace: firstStackCanvasNamespace,
-                    onContinue: {
-                        advanceFirstStackStep(to: .readiness)
-                    },
-                    onSkip: completeOnboarding
+                    onContinue: { advanceFirstStackStep(to: .addProduct) }
                 )
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .background(Color.white.ignoresSafeArea())
-            } else {
-                VStack(spacing: 0) {
-                    HStack {
-                        Button(action: goBackInFirstStackFlow) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                        }
-                        .foregroundStyle(Color.stacksInk)
-
-                        Spacer()
+            case .addProduct:
+                FirstStackAddProductCoach(
+                    title: resolvedFirstStackTitle,
+                    namespace: firstStackCanvasNamespace,
+                    onAdd: beginCameraReveal
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .background(Color.white.ignoresSafeArea())
+            case .purpose:
+                ZStack {
+                    FirstStackPurposeQuestion { purpose in
+                        firstStackPurpose = purpose
+                        advanceFirstStackStep(to: .name)
                     }
-                    .padding(.top, max(8, proxy.safeAreaInsets.top))
+                    .frame(width: proxy.size.width, height: proxy.size.height)
 
-                    Spacer(minLength: 18)
-
-                    firstStackStepContent
-                        .id(firstStackStep)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
-
-                    Spacer(minLength: 0)
-
-                    Button("Skip") {
-                        completeOnboarding()
-                    }
-                    .font(.stacksText(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.stacksMutedInk)
-                    .padding(.top, 16)
+                    Button("Skip", action: completeOnboarding)
+                        .font(.stacksText(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.stacksMutedInk)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, max(18, proxy.safeAreaInsets.bottom + 8))
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, max(28, proxy.safeAreaInsets.bottom + 12))
-                .animation(.easeInOut(duration: 0.24), value: firstStackStep)
                 .background(Color.white.ignoresSafeArea())
             }
-        }
-    }
-
-    @ViewBuilder
-    private var firstStackStepContent: some View {
-        switch firstStackStep {
-        case .name:
-            EmptyView()
-
-        case .readiness:
-            FirstFindPrompt(namespace: firstStackCanvasNamespace) {
-                services.haptics.impact(.medium)
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    isShowingFirstItemCamera = true
-                } else {
-                    isShowingFirstItemPhotoLibrary = true
-                }
-            }
-
         }
     }
 
@@ -417,11 +513,13 @@ struct OnboardingView: View {
 
     private func openFirstItemImport(
         _ importSheet: FirstItemImportSheet,
-        imageData: Data? = nil
+        imageData: Data? = nil,
+        linkPreview: ProductLinkPreview? = nil
     ) {
         if let imageData {
             firstItemImageData = imageData
         }
+        firstItemLinkPreview = linkPreview
 
         isLoadingFirstItemImport = true
         firstItemImportError = nil
@@ -446,28 +544,44 @@ struct OnboardingView: View {
     }
 
     private func finishFirstItemImport(_ stack: Stack) {
-        completeOnboarding()
+        firstItemImportSheet = nil
+        firstItemLinkPreview = nil
+        firstItemImageData = nil
+        isShowingFirstItemPhotoLibrary = false
+        withAnimation(.easeInOut(duration: 0.3)) {
+            stage = .friends
+        }
+    }
+
+    private func returnToFirstItemScanner() {
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+            firstItemImportSheet = nil
+            firstItemLinkPreview = nil
+            firstItemImageData = nil
+            isShowingFirstItemPhotoLibrary = false
+            isShowingFirstItemCamera = true
+        }
     }
 
     private func advanceFirstStackStep(to step: FirstStackStep) {
+        OnboardingKeyboard.dismiss()
         withAnimation(.easeInOut(duration: 0.24)) {
             firstStackStep = step
         }
     }
 
-    private func goBackInFirstStackFlow() {
-        switch firstStackStep {
-        case .name:
-            break
-        case .readiness:
-            advanceFirstStackStep(to: .name)
+    private func completeOnboarding() {
+        OnboardingKeyboard.dismiss()
+        guard !pro.isPro else {
+            finishOnboarding()
+            return
         }
+        pro.present(.onboarding)
+        isShowingProPaywall = true
     }
 
-    private func completeOnboarding() {
-        Task {
-            await session.completeOnboarding()
-        }
+    private func finishOnboarding() {
+        Task { await session.completeOnboarding() }
     }
 
     private func advanceToStackIt() {
@@ -479,21 +593,304 @@ struct OnboardingView: View {
         stage = .stackIt
     }
 
-    private func advanceToShareIt() {
+    private func advanceToSaveAnywhere() {
         guard stage == .stackIt else { return }
         burstMultiplier = min(burstMultiplier * 2, 4)
         burstID += 1
+        stage = .saveAnywhere
+    }
+
+    private func advanceToShareIt() {
+        guard stage == .saveAnywhere else { return }
         stage = .shareIt
     }
 
     private func advanceToFirstStack() {
         guard stage == .shareIt else { return }
         stage = .firstStack
+        loadOnboardingProfileIfNeeded()
+    }
+
+    private func beginCameraReveal() {
+        guard stage == .firstStack, firstStackStep == .addProduct else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            stage = .cameraReveal
+            isShowingFirstItemCamera = true
+        }
+    }
+
+    private func skipFirstItemImport() {
+        guard stage == .cameraReveal else { return }
+        services.haptics.impact(.light)
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isShowingFirstItemCamera = false
+            stage = .friends
+        }
+    }
+
+    private func loadOnboardingProfileIfNeeded() {
+        guard onboardingProfile == nil,
+              case .onboarding(let authSession) = session.state else { return }
+
+        Task {
+            onboardingProfile = try? await services.profiles.currentProfile(for: authSession)
+        }
+    }
+
+    @MainActor
+    private func refreshContactAuthorization() {
+        contactsAuthorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
+        if contactsAuthorizationStatus == .authorized || contactsAuthorizationStatus == .limited {
+            loadContactPreviews()
+        }
+    }
+
+    @MainActor
+    private func requestContactsAccess() {
+        switch contactsAuthorizationStatus {
+        case .authorized, .limited:
+            loadContactPreviews()
+        case .denied, .restricted:
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        case .notDetermined:
+            isRequestingContacts = true
+            Task { @MainActor in
+                let granted = (try? await CNContactStore().requestAccess(for: .contacts)) ?? false
+                isRequestingContacts = false
+                contactsAuthorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
+                if granted {
+                    loadContactPreviews()
+                    services.haptics.notification(.success)
+                }
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    @MainActor
+    private func loadContactPreviews() {
+        let keys: [CNKeyDescriptor] = [
+            CNContactIdentifierKey as CNKeyDescriptor,
+            CNContactGivenNameKey as CNKeyDescriptor,
+            CNContactFamilyNameKey as CNKeyDescriptor,
+            CNContactThumbnailImageDataKey as CNKeyDescriptor
+        ]
+        let request = CNContactFetchRequest(keysToFetch: keys)
+        request.sortOrder = .userDefault
+        var previews: [OnboardingContactPreview] = []
+
+        try? CNContactStore().enumerateContacts(with: request) { contact, stop in
+            let name = [contact.givenName, contact.familyName]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            guard !name.isEmpty else { return }
+            previews.append(
+                OnboardingContactPreview(
+                    id: contact.identifier,
+                    name: name,
+                    imageData: contact.thumbnailImageData
+                )
+            )
+            if previews.count == 7 {
+                stop.pointee = true
+            }
+        }
+        contactPreviews = previews
     }
 
     private func returnToHeroAfterCancelledSignIn() {
         if stage != .hero {
             withAnimation(.easeOut(duration: 0.2)) { stage = .hero }
+        }
+    }
+}
+
+private struct LegalAgreementNotice: View {
+    var body: some View {
+        Text("By continuing, you agree to the [Terms of Service](https://stacks.spot/terms) and acknowledge the [Privacy Policy](https://stacks.spot/privacy).")
+            .font(.stacksText(size: 10, weight: .regular))
+            .foregroundStyle(Color.stacksMutedInk)
+            .tint(Color.stacksInk)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+private struct FriendsContactsScreen: View {
+    let contacts: [OnboardingContactPreview]
+    let authorizationStatus: CNAuthorizationStatus
+    let isRequesting: Bool
+    let onAllow: () -> Void
+    let onContinue: () -> Void
+
+    private var hasAccess: Bool {
+        authorizationStatus == .authorized || authorizationStatus == .limited
+    }
+
+    private var primaryTitle: String {
+        if hasAccess { return "Continue" }
+        if authorizationStatus == .denied || authorizationStatus == .restricted {
+            return "Open Settings"
+        }
+        return "Allow Contacts"
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let isCompact = proxy.size.height < 760
+
+            VStack(spacing: 0) {
+                VStack(spacing: 10) {
+                    Text("Stacking is better\nwith friends")
+                        .font(.stacksOnboardingSerif(size: isCompact ? 40 : 46))
+                        .foregroundStyle(Color.stacksInk)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(-5)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(hasAccess
+                         ? "Your contacts are ready. Find friends, share Stacks, and make Collabs together."
+                         : "Find friends already on Stacks and make Collabs effortless.")
+                        .font(.stacksText(size: 16, weight: .regular))
+                        .foregroundStyle(Color.stacksMutedInk)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 20)
+                }
+                .padding(.top, isCompact ? 2 : 8)
+
+                FriendsContactField(contacts: contacts)
+                    .frame(height: isCompact ? 276 : 342)
+                    .padding(.top, isCompact ? 8 : 20)
+
+                Spacer(minLength: 16)
+
+                VStack(spacing: 14) {
+                    PrimaryButton(
+                        title: primaryTitle,
+                        systemImage: hasAccess ? "arrow.right" : "person.2.fill",
+                        isLoading: isRequesting,
+                        action: hasAccess ? onContinue : onAllow
+                    )
+                    .disabled(isRequesting)
+
+                    if !hasAccess {
+                        Button("Not now", action: onContinue)
+                            .font(.stacksText(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.stacksMutedInk)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, max(26, proxy.safeAreaInsets.bottom + 12))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.white.ignoresSafeArea())
+        }
+    }
+}
+
+private struct FriendsContactField: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let contacts: [OnboardingContactPreview]
+
+    private static let placeholders = [
+        OnboardingContactPreview(id: "maya", name: "Maya", imageData: nil),
+        OnboardingContactPreview(id: "ethan", name: "Ethan", imageData: nil),
+        OnboardingContactPreview(id: "lucas", name: "Lucas", imageData: nil),
+        OnboardingContactPreview(id: "viola", name: "Viola", imageData: nil),
+        OnboardingContactPreview(id: "sienna", name: "Sienna", imageData: nil),
+        OnboardingContactPreview(id: "noah", name: "Noah", imageData: nil)
+    ]
+
+    private let placements: [(CGFloat, CGFloat, Double)] = [
+        (-0.03, 0.72, -8), (0.16, 0.59, -5), (0.36, 0.46, -2),
+        (0.57, 0.35, 3), (0.77, 0.23, 6), (0.98, 0.13, 8)
+    ]
+
+    private var visibleContacts: [OnboardingContactPreview] {
+        let source = contacts.isEmpty ? Self.placeholders : contacts
+        return Array(source.prefix(placements.count))
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+                let elapsed = timeline.date.timeIntervalSinceReferenceDate
+
+                ZStack {
+                    ForEach(Array(visibleContacts.enumerated()), id: \.element.id) { index, contact in
+                        let placement = placements[index]
+                        let phase = elapsed * 0.62 + Double(index) * 0.72
+                        let driftX: CGFloat = reduceMotion ? 0 : CGFloat(cos(phase)) * 10
+                        let driftY: CGFloat = reduceMotion ? 0 : CGFloat(sin(phase)) * 5
+
+                        FriendPortrait(contact: contact, showsName: index == 2)
+                            .rotationEffect(.degrees(placement.2 + (reduceMotion ? 0 : sin(phase) * 1.4)))
+                            .position(
+                                x: proxy.size.width * placement.0 + driftX,
+                                y: proxy.size.height * placement.1 + driftY
+                            )
+                            .zIndex(Double(index + 1))
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Friends from your contacts")
+    }
+}
+
+private struct FriendPortrait: View {
+    let contact: OnboardingContactPreview
+    let showsName: Bool
+
+    private var initials: String {
+        contact.name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined()
+    }
+
+    private var tint: Color {
+        let seed = contact.name.unicodeScalars.reduce(0) { $0 + Int($1.value) }
+        let colors: [Color] = [.orange, .blue, .pink, .mint, .purple, .indigo]
+        return colors[seed % colors.count]
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 46, style: .continuous)
+                .fill(tint.gradient)
+
+            if let data = contact.imageData, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(initials)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.white)
+            }
+        }
+        .frame(width: 92, height: 132)
+        .clipShape(RoundedRectangle(cornerRadius: 46, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 46, style: .continuous)
+                .stroke(Color.white, lineWidth: 4)
+        }
+        .shadow(color: .black.opacity(0.17), radius: 10, y: 6)
+        .overlay(alignment: .top) {
+            if showsName {
+                Text(contact.name)
+                    .font(.stacksText(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.stacksInk, in: Capsule())
+                    .offset(y: -15)
+            }
         }
     }
 }
@@ -565,45 +962,117 @@ private struct FirstStackQuestion<Content: View, Primary: View>: View {
     }
 }
 
-private struct FirstFindPrompt: View {
-    let namespace: Namespace.ID
-    let onAdd: () -> Void
+private struct FirstStackPurposeQuestion: View {
+    let onSelect: (FirstStackPurpose) -> Void
 
-    private let focusedBlob = StackPlaceholderBlob.featured
+    @State private var burstAssets: [OnboardingBurstAsset] = {
+        let earlierCutouts = OnboardingProductSet.keeping.burstAssets
+            + OnboardingProductSet.stacking.burstAssets
+            + OnboardingProductSet.sharing.burstAssets
+        return Array(earlierCutouts.shuffled().prefix(10))
+    }()
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("Show us what you’ve got")
-                .font(.stacksOnboardingSerif(size: 46))
-                .foregroundStyle(Color.stacksInk)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
+        GeometryReader { proxy in
+            ZStack {
+                MagneticStackingField(assets: burstAssets)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
 
-            Text("Start with a photo or link. We'll do the rest")
-                .font(.stacksText(size: 16, weight: .regular))
-                .foregroundStyle(Color.stacksMutedInk)
-                .multilineTextAlignment(.center)
-                .padding(.top, 12)
+                VStack(spacing: 0) {
+                    Text("Stack a \(Text("wishlist").italic()), or just for \(Text("inspo").italic())")
+                        .font(.stacksOnboardingSerif(size: proxy.size.height < 650 ? 36 : 41))
+                        .foregroundStyle(Color.stacksInk)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .lineSpacing(-5)
+                        .minimumScaleFactor(0.82)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 390)
+                        .padding(.horizontal, 28)
 
-            Button(action: onAdd) {
-                PlaceholderProductBlob(blob: focusedBlob)
-                    .matchedGeometryEffect(id: focusedBlob.id, in: namespace)
-                    .frame(width: 260, height: 330)
-                    .overlay(alignment: .bottom) {
-                        Label("Open camera", systemImage: "camera.fill")
-                            .font(.stacksText(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.stacksInk)
-                            .padding(.horizontal, 18)
-                            .frame(height: 46)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .padding(.bottom, 14)
-                    }
+                    Text("Where do you want to start?")
+                        .font(.stacksText(size: 17, weight: .regular))
+                        .foregroundStyle(Color.stacksMutedInk)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 14)
+
+                    purposeChoices
+                        .padding(.horizontal, 24)
+                        .padding(.top, 26)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, max(72, proxy.safeAreaInsets.top + 58))
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens the camera to add your first product")
-            .padding(.top, 34)
         }
+    }
+
+    @ViewBuilder
+    private var purposeChoices: some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: 12) {
+                choices
+            }
+        } else {
+            choices
+        }
+    }
+
+    private var choices: some View {
+        VStack(spacing: 12) {
+            purposeButton(
+                title: "Inspo",
+                detail: "A private place for things you love.",
+                purpose: .inspiration
+            )
+            purposeButton(
+                title: "Wishlist",
+                detail: "Share a link so people can claim gifts together.",
+                purpose: .wishlist
+            )
+        }
+    }
+
+    private func purposeButton(
+        title: String,
+        detail: String,
+        purpose: FirstStackPurpose
+    ) -> some View {
+        Button {
+            onSelect(purpose)
+        } label: {
+            ZStack {
+                VStack(spacing: 4) {
+                    Text(title)
+                        .font(.stacksText(size: 19, weight: .semibold))
+                    Text(detail)
+                        .font(.stacksText(size: 14, weight: .regular))
+                        .foregroundStyle(Color.stacksMutedInk)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 34)
+
+                HStack {
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.stacksInk.opacity(0.68))
+                }
+            }
+            .foregroundStyle(Color.stacksInk)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity)
+            .stacksGlass(cornerRadius: 24, interactive: true)
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.white.opacity(0.70), lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -611,7 +1080,6 @@ private struct FirstStackNameQuestion: View {
     @Binding var title: String
     let namespace: Namespace.ID
     let onContinue: () -> Void
-    let onSkip: () -> Void
 
     private var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -619,58 +1087,104 @@ private struct FirstStackNameQuestion: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack {
+            ZStack(alignment: .bottom) {
                 EmptyStackNameCanvas(
                     title: $title,
                     namespace: namespace,
                     titleTopInset: proxy.safeAreaInsets.top + 56
                 )
 
-                OnboardingStackChrome()
-                    .padding(.horizontal, 17)
-                    .padding(.top, proxy.safeAreaInsets.top + 3)
-                    .frame(maxHeight: .infinity, alignment: .top)
-
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-
-                    PrimaryButton(title: "Continue", systemImage: "arrow.right", action: onContinue)
-                        .disabled(trimmedTitle.isEmpty)
-
-                    Button("Skip") {
-                        onSkip()
-                    }
-                    .font(.stacksText(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.stacksMutedInk)
-                    .padding(.top, 14)
+                PrimaryButton(title: "Next", systemImage: "arrow.right") {
+                    OnboardingKeyboard.dismiss()
+                    onContinue()
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .disabled(trimmedTitle.isEmpty)
+                .opacity(trimmedTitle.isEmpty ? 0.42 : 1)
+                .accessibilityIdentifier("first-stack-next")
                 .padding(.horizontal, 24)
                 .padding(.bottom, max(18, proxy.safeAreaInsets.bottom + 8))
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+    }
+}
+
+private struct FirstStackAddProductCoach: View {
+    let title: String
+    let namespace: Namespace.ID
+    let onAdd: () -> Void
+    @State private var isPulsing = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .topTrailing) {
+                EmptyStackNameCanvas(
+                    title: .constant(title),
+                    namespace: namespace,
+                    titleTopInset: proxy.safeAreaInsets.top + 56
+                )
+                .allowsHitTesting(false)
+
+                OnboardingStackChrome(canAdd: true, onAdd: onAdd)
+                    .padding(.horizontal, 17)
+                    .padding(.top, proxy.safeAreaInsets.top + 3)
+
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text("Tap + to add your first product")
+                        .font(.stacksText(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.stacksInk, in: Capsule())
+
+                    Image(systemName: "arrow.up")
+                        .font(.system(size: 23, weight: .bold))
+                        .foregroundStyle(Color.stacksInk)
+                        .rotationEffect(.degrees(13))
+                        .padding(.trailing, 58)
+                }
+                .padding(.top, proxy.safeAreaInsets.top + 50)
+                .padding(.trailing, 17)
+                .scaleEffect(isPulsing ? 1.025 : 0.98, anchor: .topTrailing)
+                .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Tap the plus button to add your first product")
+            }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
             }
         }
     }
 }
 
 private struct OnboardingStackChrome: View {
+    let canAdd: Bool
+    let onAdd: () -> Void
+
     var body: some View {
         HStack {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 25, weight: .regular))
-                .frame(width: 34, height: 34)
-
             Spacer()
 
             HStack(spacing: 14) {
-                Image(systemName: "plus")
-                    .font(.system(size: 21, weight: .regular))
+                Button(action: onAdd) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 21, weight: .medium))
+                        .frame(width: 34, height: 34)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!canAdd)
+                .foregroundStyle(Color.stacksInk.opacity(canAdd ? 1 : 0.25))
+                .accessibilityLabel("Add your first item")
+
                 Image(systemName: "ellipsis")
                     .font(.system(size: 21, weight: .regular))
+                    .foregroundStyle(Color.stacksInk.opacity(0.25))
             }
             .frame(height: 34)
         }
-        .foregroundStyle(Color.stacksInk.opacity(0.25))
-        .accessibilityHidden(true)
     }
 }
 
@@ -681,11 +1195,11 @@ private struct EmptyStackNameCanvas: View {
 
     private let blobs: [StackPlaceholderBlob] = [
         .featured,
-        StackPlaceholderBlob(id: "cap", imageName: "StickerBlueCap", x: 0.76, y: 0.31, width: 118, height: 82, rotation: 6),
-        StackPlaceholderBlob(id: "shorts", imageName: "OnboardingShorts", x: 0.70, y: 0.47, width: 130, height: 96, rotation: -4),
-        StackPlaceholderBlob(id: "wallet", imageName: "OnboardingWallet", x: 0.22, y: 0.48, width: 98, height: 76, rotation: -8),
-        StackPlaceholderBlob(id: "watch", imageName: "OnboardingWatch", x: 0.44, y: 0.64, width: 80, height: 116, rotation: 5),
-        StackPlaceholderBlob(id: "tote", imageName: "OnboardingTote", x: 0.74, y: 0.67, width: 118, height: 136, rotation: -5)
+        StackPlaceholderBlob(id: "cap", imageName: "StickerBlueCap", x: 0.76, y: 0.18, width: 118, height: 82, rotation: 6),
+        StackPlaceholderBlob(id: "shorts", imageName: "OnboardingShorts", x: 0.70, y: 0.46, width: 130, height: 96, rotation: -4),
+        StackPlaceholderBlob(id: "wallet", imageName: "OnboardingWallet", x: 0.22, y: 0.44, width: 98, height: 76, rotation: -8),
+        StackPlaceholderBlob(id: "watch", imageName: "OnboardingWatch", x: 0.44, y: 0.68, width: 80, height: 116, rotation: 5),
+        StackPlaceholderBlob(id: "tote", imageName: "OnboardingTote", x: 0.76, y: 0.73, width: 118, height: 136, rotation: -5)
     ]
 
     private var hasTitle: Bool {
@@ -698,29 +1212,40 @@ private struct EmptyStackNameCanvas: View {
             let displayTitle = hasTitle ? title : "Tap here to name your stack"
             let titleFontSize = OnboardingEditableTitleMetrics.resolvedFontSize(
                 for: displayTitle,
-                availableWidth: proxy.size.width - 32
+                availableWidth: proxy.size.width - 40
             )
+            let titleHeight = max(64, titleFontSize * 1.2)
+            let productsTop = titleTopInset + titleHeight + 47
+            let productsHeight = max(1, proxy.size.height - productsTop - 102)
 
             ZStack(alignment: .top) {
                 Color.white
+                    .onTapGesture { OnboardingKeyboard.dismiss() }
 
-                ForEach(blobs) { blob in
-                    PlaceholderProductBlob(blob: blob)
-                        .matchedGeometryEffect(id: blob.id, in: namespace)
-                        .frame(width: blob.width * scale, height: blob.height * scale)
-                        .rotationEffect(.degrees(blob.rotation))
-                        .position(
-                            x: proxy.size.width * blob.x,
-                            y: proxy.size.height * blob.y
-                        )
+                GeometryReader { area in
+                    ZStack {
+                        ForEach(blobs) { blob in
+                            PlaceholderProductBlob(blob: blob)
+                                .matchedGeometryEffect(id: blob.id, in: namespace)
+                                .frame(width: blob.width * scale, height: blob.height * scale)
+                                .rotationEffect(.degrees(blob.rotation))
+                                .position(
+                                    x: area.size.width * blob.x,
+                                    y: area.size.height * blob.y
+                                )
+                        }
+                    }
                 }
+                .frame(height: productsHeight)
+                .clipped()
+                .padding(.top, productsTop)
 
                 // Keep the placeholder mounted after typing begins. Removing it
                 // changes the ZStack's child identity and causes UIKit to discard
                 // the active text field after the first character.
                 ShimmeringStackTitle(text: "Tap here to name your stack", fontSize: titleFontSize)
                     .opacity(hasTitle ? 0 : 1)
-                    .frame(width: max(1, proxy.size.width - 32), height: max(76, titleFontSize * 1.22), alignment: .center)
+                    .frame(width: max(1, proxy.size.width - 40), height: titleHeight, alignment: .leading)
                     .padding(.top, titleTopInset)
                     .allowsHitTesting(false)
 
@@ -729,11 +1254,40 @@ private struct EmptyStackNameCanvas: View {
                     fontSize: titleFontSize,
                     isVisible: hasTitle
                 )
-                    // Keep the editable masthead constrained to one line rather
-                    // than allowing the input control to occupy the full canvas.
-                    .frame(width: max(1, proxy.size.width - 32), height: max(76, titleFontSize * 1.22), alignment: .center)
+                    .frame(width: max(1, proxy.size.width - 40), height: titleHeight, alignment: .leading)
                     .padding(.top, titleTopInset)
                     .accessibilityLabel("Tap here to name your stack")
+
+                VStack(spacing: 8) {
+                    HStack(spacing: 7) {
+                        Circle()
+                            .fill(Color.stacksInk.opacity(0.78))
+                            .frame(width: 22, height: 22)
+                            .overlay {
+                                Text("M")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+
+                        Text("Maya Ellis")
+                            .font(.system(size: 14, weight: .medium, design: .default))
+                            .foregroundStyle(Color.stacksInk.opacity(0.78))
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text("Last update")
+                            Text("Today")
+                        }
+                        .font(.system(size: 10, weight: .regular, design: .default))
+                        .foregroundStyle(Color.stacksMutedInk)
+                    }
+
+                    Divider()
+                        .overlay(Color.stacksInk.opacity(0.09))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, titleTopInset + titleHeight + 4)
             }
             .clipShape(Rectangle())
         }
@@ -741,7 +1295,7 @@ private struct EmptyStackNameCanvas: View {
 }
 
 private enum OnboardingEditableTitleMetrics {
-    static let maximumFontSize = StackTitleTokens.stackTitleMaximumFontSize
+    static let maximumFontSize: CGFloat = 49
     static let minimumFontSize = StackTitleTokens.stackTitleMinimumFontSize
     static let trackingRatio = StackTitleTokens.stackTitleTrackingRatio
 
@@ -777,7 +1331,7 @@ private struct OnboardingStackTitleField: View {
             fontSize: fontSize,
             textColor: isVisible ? UIColor(Color.stacksInk) : .clear
         )
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("Tap here to name your stack")
     }
 }
@@ -794,7 +1348,7 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.delegate = context.coordinator
         field.borderStyle = .none
         field.adjustsFontSizeToFitWidth = false
-        field.textAlignment = .center
+        field.textAlignment = .left
         field.autocapitalizationType = .none
         field.autocorrectionType = .yes
         field.spellCheckingType = .yes
@@ -802,9 +1356,10 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.returnKeyType = .done
         field.textContentType = nil
         field.clearButtonMode = .never
-        field.textAlignment = .center
+        field.textAlignment = .left
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         return field
     }
 
@@ -813,7 +1368,7 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.font = .systemFont(ofSize: fontSize, weight: .bold)
         field.textColor = textColor
         field.tintColor = UIColor(Color.stacksInk)
-        field.textAlignment = .center
+        field.textAlignment = .left
         field.defaultTextAttributes = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
             .kern: fontSize * OnboardingEditableTitleMetrics.trackingRatio
@@ -826,6 +1381,11 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         @Binding private var text: String
 
         init(text: Binding<String>) { _text = text }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            textField.resignFirstResponder()
+            return true
+        }
 
         func textField(
             _ textField: UITextField,
@@ -845,7 +1405,7 @@ private struct StackPlaceholderBlob: Identifiable {
         id: "featured-blob",
         imageName: "OnboardingTShirt",
         x: 0.27,
-        y: 0.33,
+        y: 0.20,
         width: 142,
         height: 136,
         rotation: -6
@@ -888,8 +1448,8 @@ private struct ShimmeringStackTitle: View {
             .tracking(fontSize * OnboardingEditableTitleMetrics.trackingRatio)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(
                 LinearGradient(
                     colors: [
@@ -1070,14 +1630,16 @@ private struct EditorialOnboardingProductField: View {
     let assets: [OnboardingHeroAsset]
 
     private let placements: [ProductPlacement] = [
-        ProductPlacement(asset: .coffeeMachine, x: 0.20, y: 0.22, width: 142, rotation: -4),
-        ProductPlacement(asset: .foldingCrate, x: 0.64, y: 0.17, width: 146, rotation: 3),
-        ProductPlacement(asset: .discoBall, x: 0.89, y: 0.18, width: 78, rotation: 7),
-        ProductPlacement(asset: .stripedCup, x: 0.65, y: 0.38, width: 116, rotation: -4),
-        ProductPlacement(asset: .blueLamp, x: 0.34, y: 0.46, width: 108, rotation: 6),
-        ProductPlacement(asset: .orangeLamp, x: 0.20, y: 0.64, width: 122, rotation: -5),
-        ProductPlacement(asset: .mokaPot, x: 0.84, y: 0.58, width: 104, rotation: 5),
-        ProductPlacement(asset: .orangeChair, x: 0.33, y: 0.86, width: 148, rotation: -6)
+        ProductPlacement(asset: .ramblinCap, x: 0.17, y: 0.15, width: 118, rotation: -7),
+        ProductPlacement(asset: .orangeLamp, x: 0.50, y: 0.12, width: 116, rotation: 0),
+        ProductPlacement(asset: .beanieSlateBird, x: 0.82, y: 0.16, width: 120, rotation: 5),
+        ProductPlacement(asset: .beanieBurgundyBird, x: 0.20, y: 0.40, width: 138, rotation: -5),
+        ProductPlacement(asset: .redBosHat, x: 0.51, y: 0.38, width: 112, rotation: 1),
+        ProductPlacement(asset: .blueWindbreaker, x: 0.80, y: 0.40, width: 146, rotation: 4),
+        ProductPlacement(asset: .memorialShirt, x: 0.18, y: 0.67, width: 154, rotation: 4),
+        ProductPlacement(asset: .coffeeMachine, x: 0.53, y: 0.62, width: 100, rotation: -4),
+        ProductPlacement(asset: .duffelBag, x: 0.78, y: 0.67, width: 138, rotation: -3),
+        ProductPlacement(asset: .sambaShoe, x: 0.60, y: 0.77, width: 132, rotation: 4)
     ]
 
     var body: some View {
@@ -1133,17 +1695,31 @@ private enum OnboardingHeroAsset: String, CaseIterable, Hashable {
     case wine = "OnboardingWine"
     case wallet = "OnboardingWallet"
     case sneaker = "OnboardingSneaker"
+    case sambaShoe = "OnboardingSambaShoe"
+    case memorialShirt = "OnboardingMemorialShirt"
+    case duffelBag = "OnboardingDuffelBag"
+    case redBosHat = "OnboardingRedBosHat"
+    case filmCrewCap = "OnboardingFilmCrewCap"
+    case adidasShorts = "OnboardingAdidasShorts"
     case keys = "OnboardingKeys"
     case tote = "OnboardingTote"
     case coffeeMachine = "HeroCoffeeMachine"
     case foldingCrate = "HeroFoldingCrate"
     case stripedCup = "HeroStripedCup"
-    case orangeLamp = "HeroOrangeLamp"
+    case orangeLamp = "OnboardingLampOrangeMushroom"
     case mokaPot = "HeroMokaPot"
     case discoBall = "HeroDiscoBall"
     case blueLamp = "HeroBlueLamp"
     case orangeChair = "HeroOrangeChair"
     case blueBlanket = "HeroBlueBlanket"
+    case navyCap = "OnboardingNavyCap"
+    case ramblinCap = "OnboardingRamblinCap"
+    case blueWindbreaker = "OnboardingBlueWindbreaker"
+    case greenTee = "OnboardingGreenTee"
+    case beanieRustVintage = "BeanieRustVintage"
+    case beanieGreenStripe = "BeanieGreenStripe"
+    case beanieSlateBird = "BeanieSlateBird"
+    case beanieBurgundyBird = "BeanieBurgundyBird"
 
     var accessibilityLabel: String {
         switch self {
@@ -1154,6 +1730,12 @@ private enum OnboardingHeroAsset: String, CaseIterable, Hashable {
         case .wine: "Wine bottle"
         case .wallet: "Leather pouch"
         case .sneaker: "Sneaker"
+        case .sambaShoe: "Navy Adidas Samba shoes"
+        case .memorialShirt: "Graphic T-shirt"
+        case .duffelBag: "Duffel bag"
+        case .redBosHat: "Red BOS cap"
+        case .filmCrewCap: "Film crew cap"
+        case .adidasShorts: "Adidas shorts"
         case .keys: "Keys"
         case .tote: "Canvas tote"
         case .coffeeMachine: "Espresso machine"
@@ -1165,6 +1747,14 @@ private enum OnboardingHeroAsset: String, CaseIterable, Hashable {
         case .blueLamp: "Blue table lamp"
         case .orangeChair: "Orange lounge chair"
         case .blueBlanket: "Blue blanket"
+        case .navyCap: "Navy embroidered cap"
+        case .ramblinCap: "Blue Ramblin cap"
+        case .blueWindbreaker: "Blue windbreaker"
+        case .greenTee: "Green athletic T-shirt"
+        case .beanieRustVintage: "Rust vintage beanie"
+        case .beanieGreenStripe: "Green striped beanie"
+        case .beanieSlateBird: "Blue bird beanie"
+        case .beanieBurgundyBird: "Burgundy bird beanie"
         }
     }
 }
@@ -1177,7 +1767,7 @@ private enum OnboardingProductSet {
     var heroAssets: [OnboardingHeroAsset] {
         switch self {
         case .keeping:
-            [.coffeeMachine, .foldingCrate, .stripedCup, .orangeLamp, .mokaPot, .discoBall, .blueLamp, .orangeChair]
+            [.ramblinCap, .beanieSlateBird, .orangeLamp, .beanieBurgundyBird, .redBosHat, .blueWindbreaker, .memorialShirt, .coffeeMachine, .duffelBag, .sambaShoe]
         case .stacking:
             [.tShirt, .shorts, .earrings, .watch, .wine, .wallet, .sneaker]
         case .sharing:
@@ -1207,6 +1797,9 @@ private enum OnboardingStickerAsset: String, CaseIterable, Hashable {
     case eightBall = "StickerEightBall"
     case brooklynBall = "StickerBrooklynBall"
     case lipstick = "StickerLipstick"
+    case yellowTaxi = "StickerYellowTaxi"
+    case upsideDownPerson = "StickerUpsideDownPerson"
+    case legoHead = "StickerLegoHead"
 
     var accessibilityLabel: String {
         switch self {
@@ -1219,6 +1812,9 @@ private enum OnboardingStickerAsset: String, CaseIterable, Hashable {
         case .eightBall: "Eight ball"
         case .brooklynBall: "Brooklyn basketball"
         case .lipstick: "Red lipstick"
+        case .yellowTaxi: "Yellow taxi"
+        case .upsideDownPerson: "Upside-down portrait sticker"
+        case .legoHead: "Worried LEGO head sticker"
         }
     }
 }
@@ -1297,6 +1893,12 @@ private enum OnboardingBurstAsset: Hashable {
         case .wardrobe(.wine): 156
         case .wardrobe(.wallet): 86
         case .wardrobe(.sneaker): 136
+        case .wardrobe(.sambaShoe): 154
+        case .wardrobe(.memorialShirt): 162
+        case .wardrobe(.duffelBag): 160
+        case .wardrobe(.redBosHat): 116
+        case .wardrobe(.filmCrewCap): 126
+        case .wardrobe(.adidasShorts): 136
         case .wardrobe(.keys): 106
         case .wardrobe(.tote): 142
         case .wardrobe(.coffeeMachine): 130
@@ -1308,6 +1910,14 @@ private enum OnboardingBurstAsset: Hashable {
         case .wardrobe(.blueLamp): 102
         case .wardrobe(.orangeChair): 148
         case .wardrobe(.blueBlanket): 144
+        case .wardrobe(.navyCap): 126
+        case .wardrobe(.ramblinCap): 126
+        case .wardrobe(.blueWindbreaker): 156
+        case .wardrobe(.greenTee): 146
+        case .wardrobe(.beanieRustVintage): 120
+        case .wardrobe(.beanieGreenStripe): 138
+        case .wardrobe(.beanieSlateBird): 120
+        case .wardrobe(.beanieBurgundyBird): 138
         case .sticker(.everySecond): 146
         case .sticker(.callMe): 136
         case .sticker(.pocketWatch): 92
@@ -1317,6 +1927,9 @@ private enum OnboardingBurstAsset: Hashable {
         case .sticker(.eightBall): 88
         case .sticker(.brooklynBall): 94
         case .sticker(.lipstick): 88
+        case .sticker(.yellowTaxi): 158
+        case .sticker(.upsideDownPerson): 142
+        case .sticker(.legoHead): 106
         case .running(.headphones): 126
         case .running(.cap): 106
         case .running(.bottle): 92
@@ -1349,6 +1962,12 @@ private enum OnboardingBurstAsset: Hashable {
         case .wardrobe(.wine): -3
         case .wardrobe(.wallet): -12
         case .wardrobe(.sneaker): -3
+        case .wardrobe(.sambaShoe): 2
+        case .wardrobe(.memorialShirt): 4
+        case .wardrobe(.duffelBag): -4
+        case .wardrobe(.redBosHat): 1
+        case .wardrobe(.filmCrewCap): 5
+        case .wardrobe(.adidasShorts): -5
         case .wardrobe(.keys): 7
         case .wardrobe(.tote): 4
         case .wardrobe(.coffeeMachine): -5
@@ -1360,6 +1979,14 @@ private enum OnboardingBurstAsset: Hashable {
         case .wardrobe(.blueLamp): -8
         case .wardrobe(.orangeChair): -6
         case .wardrobe(.blueBlanket): 4
+        case .wardrobe(.navyCap): 5
+        case .wardrobe(.ramblinCap): -7
+        case .wardrobe(.blueWindbreaker): 4
+        case .wardrobe(.greenTee): -5
+        case .wardrobe(.beanieRustVintage): 5
+        case .wardrobe(.beanieGreenStripe): -5
+        case .wardrobe(.beanieSlateBird): 5
+        case .wardrobe(.beanieBurgundyBird): -5
         case .sticker(.everySecond): -4
         case .sticker(.callMe): 5
         case .sticker(.pocketWatch): -8
@@ -1369,6 +1996,9 @@ private enum OnboardingBurstAsset: Hashable {
         case .sticker(.eightBall): -9
         case .sticker(.brooklynBall): 5
         case .sticker(.lipstick): -7
+        case .sticker(.yellowTaxi): -4
+        case .sticker(.upsideDownPerson): 7
+        case .sticker(.legoHead): -7
         case .running(.headphones): -8
         case .running(.cap): 7
         case .running(.bottle): -5
@@ -1468,26 +2098,22 @@ private struct PhysicsExplainerScreen: View {
 }
 
 private struct SharedStackPreview: View {
-    private let previewAssets = ["RunningSneaker", "RunningCap", "RunningHeadphones"]
+    private let previewAssets = [
+        "OnboardingLampOrangeMushroom",
+        "OnboardingLampAquaMushroom",
+        "OnboardingLampPleatedBlue"
+    ]
 
     var body: some View {
         ZStack {
             AbstractShareBubbleShape()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.22, green: 0.48, blue: 0.73),
-                            Color(red: 0.16, green: 0.39, blue: 0.64)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(.ultraThinMaterial)
                 .overlay {
                     AbstractShareBubbleShape()
-                        .stroke(Color.white.opacity(0.20), lineWidth: 1)
+                        .fill(Color.white.opacity(0.16))
+                        .stroke(Color.white.opacity(0.76), lineWidth: 1)
                 }
-                .shadow(color: .black.opacity(0.17), radius: 20, x: 0, y: 10)
+                .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 9) {
@@ -1500,7 +2126,7 @@ private struct SharedStackPreview: View {
                             Circle().stroke(Color.white.opacity(0.82), lineWidth: 1)
                         }
 
-                    Text("Run Club")
+                    Text("Lamps for apt")
                         .font(.stacksMasthead(size: 21))
                         .tracking(-0.45)
                         .foregroundStyle(.white)
@@ -1523,7 +2149,7 @@ private struct SharedStackPreview: View {
                 HStack(spacing: 6) {
                     Image(systemName: "link")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("stacks.app/owen/runclub")
+                    Text("stacks.spot/aliva/lamps-for-apt")
                         .font(.stacksText(size: 12, weight: .medium))
                     Spacer(minLength: 0)
                 }
@@ -1534,6 +2160,444 @@ private struct SharedStackPreview: View {
             .padding(.bottom, 22)
         }
         .frame(height: 188)
+    }
+}
+
+private struct SaveFromAnywhereVisual: View {
+    @State private var page = 0
+    let onComplete: () -> Void
+
+    private let titles = [
+        "Save from the share sheet",
+        "Save from any link",
+        "Save from a barcode"
+    ]
+
+    var body: some View {
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                Text(titles[page])
+                    .font(.stacksOnboardingSerif(size: proxy.size.height < 760 ? 46 : 52))
+                    .foregroundStyle(Color.stacksInk)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: min(360, proxy.size.width - 48))
+                    .padding(.top, max(20, proxy.safeAreaInsets.top + 12))
+
+                Spacer(minLength: 8)
+
+                ZStack {
+                    switch page {
+                    case 0:
+                        SafariSaveDemo()
+                    case 1:
+                        LinkSaveDemo()
+                    default:
+                        BarcodeSaveDemo(isActive: page == 2)
+                    }
+                }
+                .id(page)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .frame(width: proxy.size.width - 20,
+                       height: min(proxy.size.height * 0.57, 540))
+
+                Spacer(minLength: 8)
+
+                VStack(spacing: 18) {
+                    HStack(spacing: 7) {
+                        ForEach(0..<3) { index in
+                            Capsule()
+                                .fill(page == index ? Color.stacksInk : Color.stacksMutedInk.opacity(0.24))
+                                .frame(width: page == index ? 20 : 7, height: 7)
+                        }
+                    }
+                    .accessibilityHidden(true)
+
+                    PrimaryButton(title: "Next", systemImage: "arrow.right", action: advance)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, max(26, proxy.safeAreaInsets.bottom + 14))
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 55)
+                    .onEnded { gesture in
+                        if gesture.translation.width < -70 {
+                            advance()
+                        } else if gesture.translation.width > 70, page > 0 {
+                            withAnimation(.easeInOut(duration: 0.42)) { page -= 1 }
+                        }
+                    }
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Way \(page + 1) of 3 to save")
+            .accessibilityAction(named: "Next way to save") { advance() }
+        }
+    }
+
+    private func advance() {
+        if page < 2 {
+            withAnimation(.easeInOut(duration: 0.42)) { page += 1 }
+        } else {
+            withAnimation(.easeInOut(duration: 0.42)) { onComplete() }
+        }
+    }
+}
+
+private struct SafariSaveDemo: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let viewportHeight = min(proxy.size.height - 6, 590)
+            let viewportWidth = min(proxy.size.width - 8, viewportHeight * 644 / 1400)
+
+            ZStack {
+                Color.white
+
+                Image("OnboardingSafariShareSheet")
+                    .resizable()
+                    .scaledToFit()
+                .frame(width: viewportWidth, height: viewportHeight)
+                .clipped()
+            }
+            .frame(width: viewportWidth, height: viewportHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 25, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 25, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.09), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.16), radius: 18, x: 0, y: 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Safari share sheet showing the Stacks destination")
+    }
+}
+
+private struct LinkSaveDemo: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var focusesLink = false
+
+    var body: some View {
+        VStack(spacing: 22) {
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Circle().fill(Color(red: 1, green: 0.37, blue: 0.35)).frame(width: 9, height: 9)
+                    Circle().fill(Color(red: 1, green: 0.74, blue: 0.27)).frame(width: 9, height: 9)
+                    Circle().fill(Color(red: 0.31, green: 0.78, blue: 0.38)).frame(width: 9, height: 9)
+                    Spacer()
+                    Text("Safari")
+                        .font(.stacksText(size: 11, weight: .medium))
+                        .foregroundStyle(Color.stacksMutedInk)
+                    Spacer()
+                    Color.clear.frame(width: 38, height: 1)
+                }
+                .frame(height: 11)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 13)
+                .frame(height: 34)
+                .background(Color(red: 0.96, green: 0.96, blue: 0.96))
+
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .medium))
+                    Text("newamsterdamsurf.com/products/logo-hoodie-ash")
+                        .font(.stacksText(size: 11, weight: .medium))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(focusesLink ? Color.blue : Color.stacksMutedInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 28)
+                .padding(.horizontal, 9)
+                .background(
+                    focusesLink ? Color.blue.opacity(0.13) : Color.black.opacity(0.045),
+                    in: RoundedRectangle(cornerRadius: 7)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(focusesLink ? Color.blue.opacity(0.32) : .clear, lineWidth: 1)
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 8)
+
+                Image("OnboardingBlueWindbreaker")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 172)
+                    .padding(.horizontal, 20)
+            }
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .background(Color.white.opacity(0.22), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.72), lineWidth: 1)
+            }
+        }
+        .frame(maxWidth: 340)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Copy the hoodie product link from Safari, then paste it into Stacks")
+        .onAppear {
+            focusesLink = reduceMotion
+            guard !reduceMotion else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(850))
+                guard !Task.isCancelled else { return }
+                withAnimation(.spring(response: 0.48, dampingFraction: 0.78)) {
+                    focusesLink = true
+                }
+            }
+        }
+    }
+}
+
+private struct BarcodeSaveDemo: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isActive: Bool
+    @State private var scanning = false
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                HStack {
+                    barcodeGlassIcon("xmark")
+                    Spacer()
+                    Text("Scan barcode").font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    barcodeGlassIcon("bolt.slash")
+                }
+                .padding(16)
+                Spacer()
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(.white.opacity(0.10))
+                        .frame(width: 220, height: 112)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18)
+                                .strokeBorder(Color.stacksInk.opacity(0.44), lineWidth: 1.5)
+                        }
+                    HStack(spacing: 3) {
+                        ForEach(0..<28) { index in
+                            Rectangle()
+                                .fill(Color.white.opacity(0.92))
+                                .frame(width: index.isMultiple(of: 4) ? 4 : 2,
+                                       height: index.isMultiple(of: 3) ? 62 : 48)
+                        }
+                    }
+                    Rectangle()
+                        .fill(Color(red: 0.16, green: 0.68, blue: 0.57))
+                        .frame(width: 205, height: 2)
+                        .shadow(color: Color(red: 0.16, green: 0.68, blue: 0.57).opacity(0.6), radius: 4)
+                        .offset(y: scanning ? 44 : -44)
+                }
+                Spacer()
+                Text("Point at a product barcode")
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.bottom, 25)
+            }
+            .foregroundStyle(Color.white)
+        }
+        .frame(maxWidth: 340)
+        .frame(height: 292)
+        .modifier(BarcodeBlackGlass())
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .stroke(Color.white.opacity(0.78), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.10), radius: 21, x: 0, y: 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel("Scan a product barcode to find and save its listing")
+        .onChange(of: isActive, initial: true) { _, active in
+            scanning = false
+            guard active, !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 1.45).repeatForever(autoreverses: true)) {
+                scanning = true
+            }
+        }
+    }
+
+    private func barcodeGlassIcon(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .semibold))
+            .frame(width: 30, height: 30)
+            .background(.white.opacity(0.12), in: Circle())
+            .overlay {
+                Circle().stroke(Color.white.opacity(0.72), lineWidth: 0.8)
+            }
+    }
+}
+
+private struct BarcodeBlackGlass: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            content
+                .background(Color.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+                .glassEffect(.regular.tint(Color.black.opacity(0.80)), in: .rect(cornerRadius: 23))
+        } else {
+            fallback(content)
+        }
+        #else
+        fallback(content)
+        #endif
+    }
+
+    private func fallback(_ content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+            .background(Color.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+    }
+}
+
+private enum SaveSurfaceKind {
+    case browser
+    case social
+}
+
+private struct SaveSurfaceWindow: View {
+    let kind: SaveSurfaceKind
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if kind == .browser {
+                browserChrome
+            } else {
+                socialChrome
+            }
+
+            BouncingStickerCollage()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(kind == .browser ? Color(red: 0.972, green: 0.969, blue: 0.963) : .white)
+                .clipped()
+
+            if kind == .social {
+                socialFooter
+            }
+        }
+        .frame(maxWidth: 340)
+        .frame(height: 292)
+        .background(.white, in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.09), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.13), radius: 21, x: 0, y: 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityLabel(kind == .browser
+            ? "Browser window with colorful cutout stickers bouncing inside"
+            : "Social media post with colorful cutout stickers bouncing inside")
+    }
+
+    private var browserChrome: some View {
+        HStack(spacing: 7) {
+            Circle().fill(Color(red: 1, green: 0.37, blue: 0.34)).frame(width: 9, height: 9)
+            Circle().fill(Color(red: 1, green: 0.74, blue: 0.24)).frame(width: 9, height: 9)
+            Circle().fill(Color(red: 0.28, green: 0.76, blue: 0.36)).frame(width: 9, height: 9)
+
+            Text("stacks.app / finds")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.stacksMutedInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.045), in: Capsule())
+
+            Image(systemName: "square.on.square")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.stacksMutedInk)
+        }
+        .frame(height: 11)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 13)
+        .background(Color(red: 0.955, green: 0.953, blue: 0.948))
+        .overlay(alignment: .bottom) { Color.black.opacity(0.07).frame(height: 1) }
+    }
+
+    private var socialChrome: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color.stacksInk)
+                .frame(width: 26, height: 26)
+                .overlay {
+                    Text("s")
+                        .font(.system(size: 15, weight: .semibold, design: .serif))
+                        .foregroundStyle(.white)
+                }
+            Text("saved.by.stacks")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.stacksInk)
+            Spacer()
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Color.stacksInk)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 43)
+    }
+
+    private var socialFooter: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "heart")
+            Image(systemName: "bubble.right")
+            Image(systemName: "paperplane")
+            Spacer()
+            Image(systemName: "bookmark")
+        }
+        .font(.system(size: 17, weight: .regular))
+        .foregroundStyle(Color.stacksInk)
+        .padding(.horizontal, 14)
+        .frame(height: 37)
+    }
+}
+
+private struct BouncingStickerCollage: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasBlasted = false
+    @State private var isFloating = false
+
+    private let stickers: [(OnboardingStickerAsset, CGFloat, CGFloat, CGFloat, CGFloat, CGFloat)] = [
+        (.blueCap, 0.19, 0.24, 80, 10, -9),
+        (.nyApple, 0.73, 0.21, 67, -11, 9),
+        (.vinyl, 0.49, 0.45, 82, 9, 11),
+        (.yellowTaxi, 0.81, 0.68, 86, -12, -8),
+        (.eightBall, 0.23, 0.72, 67, 11, 8),
+        (.lipstick, 0.56, 0.78, 63, -8, -11),
+        (.brooklynBall, 0.76, 0.42, 58, 8, 10)
+    ]
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(Array(stickers.enumerated()), id: \.offset) { index, sticker in
+                    Image(sticker.0.rawValue)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: sticker.3, height: sticker.3)
+                        .shadow(color: .black.opacity(0.16), radius: 6, x: 0, y: 5)
+                        .rotationEffect(.degrees(isFloating ? Double(sticker.4) : -Double(sticker.4)))
+                        .scaleEffect(hasBlasted ? 1 : 0.12)
+                        .position(x: proxy.size.width * sticker.1, y: proxy.size.height * sticker.2)
+                        .offset(
+                            x: isFloating ? sticker.4 : -sticker.4,
+                            y: isFloating ? sticker.5 : -sticker.5
+                        )
+                        .animation(.spring(response: 0.6, dampingFraction: 0.65).delay(Double(index) * 0.055), value: hasBlasted)
+                        .animation(.easeInOut(duration: 1.5 + Double(index) * 0.13).repeatForever(autoreverses: true), value: isFloating)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .onAppear {
+            hasBlasted = true
+            if !reduceMotion { isFloating = true }
+        }
     }
 }
 
@@ -1655,15 +2719,17 @@ private struct ExplainerScreen<Visual: View>: View {
                     .lineSpacing(-6)
                     .minimumScaleFactor(0.7)
                     .allowsTightening(true)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 380)
+                    // The title must receive a real width constraint before it
+                    // chooses its line breaks; fixedSize here made longer titles
+                    // keep one line and run beyond the right edge.
+                    .frame(maxWidth: min(360, proxy.size.width - 48))
                     .padding(.horizontal, 24)
 
                 visual
-                    .frame(maxWidth: .infinity)
+                    .frame(width: max(1, proxy.size.width - 20))
                     .frame(height: visualHeight)
-                    .padding(.horizontal, 10)
                     .padding(.top, isCompact ? 10 : 16)
+                    .clipped()
 
                 Spacer(minLength: 4)
 
@@ -1675,10 +2741,14 @@ private struct ExplainerScreen<Visual: View>: View {
                     .font(.stacksText(size: 16, weight: .semibold))
                     .foregroundStyle(Color.stacksMutedInk)
                 }
-                .padding(.horizontal, 24)
+                .frame(width: max(1, proxy.size.width - 48))
                 .padding(.bottom, 28)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // SaveFromAnywhereReference is a very wide source image. Give the
+            // whole composition the device's exact width so no child can expand
+            // the VStack and push the centered content offscreen.
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
         }
     }
 }
@@ -2116,11 +3186,6 @@ private struct TiltShareStackPreview: View {
                             .stroke(Color.stacksInk.opacity(0.08), lineWidth: 1)
                     }
                     .shadow(color: .black.opacity(0.12), radius: 18, x: 0, y: 12)
-
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(Color.stacksInk)
-                    .position(x: previewSize.width * 0.09, y: previewSize.height * 0.10)
 
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .semibold))
