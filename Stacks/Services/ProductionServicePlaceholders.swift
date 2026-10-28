@@ -484,7 +484,7 @@ private struct SupabaseClient: Sendable {
         JSONEncoder()
     }
 
-    private var decoder: JSONDecoder {
+    var decoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -825,6 +825,19 @@ struct SupabaseStackRepository: StackRepository {
         try await fetchStack(id: id, viewerID: userID)
     }
 
+    func fetchPublicStacks(ownerID: UUID, for viewerID: UUID) async throws -> [Stack] {
+        let rows: [StackRow] = try await client.rest(
+            "stacks",
+            query: [
+                URLQueryItem(name: "owner_id", value: "eq.\(ownerID.uuidString)"),
+                URLQueryItem(name: "visibility", value: "eq.public"),
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "order", value: "updated_at.desc")
+            ]
+        )
+        return try await compose(rows: rows, viewerID: viewerID)
+    }
+
     func fetchDiscoverStacks(query: String?) async throws -> [Stack] {
         let curated = (try? await CuratedStackCatalog.fetchStacks()) ?? []
         let viewer = try await client.authUser()
@@ -1096,13 +1109,22 @@ struct SupabaseStackRepository: StackRepository {
         )
         let profileIDs = Array(Set(ownerIDs + collaboratorRows.map(\.userID)))
         let profileList = profileIDs.map(\.uuidString).joined(separator: ",")
-        let profiles: [ProfileRow] = try await client.rest(
+        var profiles: [ProfileRow] = try await client.rest(
             "profiles",
             query: [
                 URLQueryItem(name: "id", value: "in.(\(profileList))"),
                 URLQueryItem(name: "select", value: "*")
             ]
         )
+        // Row security only exposes Discover and Collab profiles directly.
+        // Every profile is public at stacks.spot/username, so fetch the
+        // remaining authors' public fields instead of showing a placeholder.
+        let missingProfileIDs = Set(profileIDs).subtracting(profiles.map(\.id))
+        if !missingProfileIDs.isEmpty {
+            let body = try JSONEncoder().encode(["target_ids": missingProfileIDs.map(\.uuidString)])
+            let data = try await client.restData("rpc/public_profiles", method: "POST", body: body)
+            profiles += (try? client.decoder.decode([ProfileRow].self, from: data)) ?? []
+        }
         let items: [ItemRow] = try await client.rest(
             "stack_items",
             query: [
@@ -1305,6 +1327,12 @@ struct SupabaseProfileRepository: ProfileRepository {
 
     func enableProfileSharing() async throws {
         _ = try await client.restData("rpc/enable_profile_sharing", method: "POST", body: Data("{}".utf8))
+    }
+
+    func publicProfile(username: String) async throws -> UserProfile? {
+        let body = try JSONEncoder().encode(["target_username": username])
+        let data = try await client.restData("rpc/public_profile_by_username", method: "POST", body: body)
+        return try client.decoder.decode([ProfileRow].self, from: data).first?.profile(using: client.configuration)
     }
 
     func disableProfileSharing() async throws {

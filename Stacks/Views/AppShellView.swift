@@ -240,6 +240,9 @@ struct AppShellView: View {
             guard let link else { return }
             Task { await openUniversalStack(link) }
         }
+        .task(id: session.pendingProfileLink) {
+            if let link = session.pendingProfileLink { await openProfileLink(link) }
+        }
         .sheet(item: Binding(get: { pro.gate }, set: { if $0 == nil { pro.close() } })) { _ in
             StacksProPaywall()
         }
@@ -415,6 +418,30 @@ struct AppShellView: View {
             session.lastError = nil
         } catch {
             session.lastError = "This Stack link is invalid or no longer available."
+            services.haptics.notification(.error)
+        }
+    }
+
+    @MainActor
+    private func openProfileLink(_ link: PublicProfileUniversalLink) async {
+        guard session.pendingProfileLink == link,
+              let user = session.currentUser else { return }
+        session.clearPendingProfileLink()
+        do {
+            guard let profile = try await services.profiles.publicProfile(username: link.username) else {
+                throw AppError.notFound
+            }
+            selectedTab = .home
+            homeSection = .stacks
+            homePath.append(.profile(profile))
+            if let slug = link.stackSlug {
+                let stacks = try await services.stacks.fetchPublicStacks(ownerID: profile.id, for: user.id)
+                guard let stack = stacks.first(where: { $0.webSlug == slug }) else { throw AppError.notFound }
+                homePath.append(.stack(stack))
+            }
+            session.lastError = nil
+        } catch {
+            session.lastError = "This profile or Stack is private or no longer available."
             services.haptics.notification(.error)
         }
     }

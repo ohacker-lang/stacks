@@ -73,7 +73,7 @@ struct SharedLinkImportProgressView: View {
                 let created = try await services.stacks.createStack(
                     title: requestedTitle,
                     wishlistMode: true,
-                    visibility: .private,
+                    visibility: StackVisibility.defaultForNewStacks,
                     owner: user
                 )
                 createdDestination = created
@@ -435,7 +435,7 @@ struct PendingSharedLinkSheet: View {
                 let stack = try await services.stacks.createStack(
                     title: title,
                     wishlistMode: newStackWishlistMode,
-                    visibility: .private,
+                    visibility: StackVisibility.defaultForNewStacks,
                     owner: user
                 )
                 services.haptics.notification(.success)

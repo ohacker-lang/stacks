@@ -1411,7 +1411,7 @@ private struct StackSettingsOverlay: View {
         case .private: "Only you can see it."
         case .inviteOnly: "Only invited people can open it."
         case .publicLink: "Anyone with the link can view it."
-        case .publicDiscover: "Anyone can find it in Discover."
+        case .publicDiscover: "Anyone can see it on your profile."
         }
     }
 
@@ -1645,7 +1645,7 @@ private struct StackVisibilityEditorSheet: View {
         case .private: "Only you can view this Stack."
         case .inviteOnly: "Only people you invite can open it."
         case .publicLink: "Anyone with the link can view it."
-        case .publicDiscover: "Anyone can find it in Discover."
+        case .publicDiscover: "Anyone can see it on your stacks.spot profile."
         }
     }
 }

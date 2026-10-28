@@ -115,6 +115,9 @@ serve(async (req) => {
       stack: {
         id: stack.id,
         title: stack.title,
+        slug: stackSlug(stack.title),
+        visibility: stack.visibility,
+        updatedAt: stack.updated_at,
         wishlistMode: stack.wishlist_mode,
         author: profile ? {
           displayName: profile.display_name,
@@ -185,46 +188,64 @@ async function publicStackFeed(page: number): Promise<Response> {
 async function publicProfile(username: string): Promise<Response> {
   const admin = serviceClient();
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("id, display_name, username, bio, avatar_path, discovery_enabled, profile_share_enabled")
+    .select("id, display_name, username, bio, avatar_path")
     .eq("username", username)
     .maybeSingle();
   if (profileError) throw profileError;
   if (!profile) return jsonResponse({ error: "Profile unavailable." }, 404);
 
+  // Every account has a public page, like a Pinterest profile. Only Stacks
+  // the owner made public appear on it; private and link-only Stacks never do.
   const { data: stacks, error: stackError } = await admin.from("stacks")
-    .select("id, title, updated_at")
+    .select("id, title, updated_at, wishlist_mode")
     .eq("owner_id", profile.id)
     .eq("visibility", "public")
     .order("updated_at", { ascending: false })
-    .limit(24);
+    .limit(60);
   if (stackError) throw stackError;
-  // Sharing one's profile is an explicit opt-in; a public Stack also exposes
-  // its byline without making unrelated private Stacks or bio public.
-  if (!profile.profile_share_enabled && !profile.discovery_enabled && (stacks ?? []).length === 0) {
-    return jsonResponse({ error: "Profile unavailable." }, 404);
-  }
   const avatarURL = profile.avatar_path
     ? (await admin.storage.from("profile-media").createSignedUrl(profile.avatar_path, 300)).data?.signedUrl ?? null
     : null;
   const publicStacks = await Promise.all((stacks ?? []).map(async (stack) => {
-    const { data: items, error } = await admin.from("stack_items")
-      .select("removed_background_image_path, original_image_path")
+    const { data: items, error, count } = await admin.from("stack_items")
+      .select("removed_background_image_path, original_image_path", { count: "exact" })
       .eq("stack_id", stack.id)
       .order("created_at")
-      .limit(4);
+      .limit(6);
     if (error) throw error;
     const images = await Promise.all((items ?? []).map(async (item) => {
       const path = item.removed_background_image_path ?? item.original_image_path;
       return path ? (await admin.storage.from(bucket).createSignedUrl(path, 300)).data?.signedUrl ?? null : null;
     }));
-    return { id: stack.id, title: stack.title, images: images.filter((image): image is string => Boolean(image)) };
+    return {
+      id: stack.id,
+      title: stack.title,
+      slug: stackSlug(stack.title),
+      updatedAt: stack.updated_at,
+      wishlistMode: stack.wishlist_mode,
+      itemCount: count ?? items?.length ?? 0,
+      images: images.filter((image): image is string => Boolean(image)),
+      coverPath: (items ?? []).map((item) => item.removed_background_image_path ?? item.original_image_path).find(Boolean) ?? null,
+    };
   }));
-  return jsonResponse({ profile: {
-    displayName: profile.display_name,
-    username: profile.username,
-    bio: profile.discovery_enabled ? profile.bio : "",
-    avatarURL,
-  }, stacks: publicStacks });
+  // Link previews (iMessage, Instagram) fetch the image later, so it needs a
+  // longer-lived URL than the page itself. It is already a public Stack image.
+  const coverPath = publicStacks.find((stack) => stack.coverPath)?.coverPath;
+  const shareImageURL = coverPath
+    ? (await admin.storage.from(bucket).createSignedUrl(coverPath, 60 * 60 * 24 * 7)).data?.signedUrl ?? null
+    : null;
+  return jsonResponse({
+    profile: {
+      displayName: profile.display_name,
+      username: profile.username,
+      bio: profile.bio ?? "",
+      avatarURL,
+      stackCount: publicStacks.length,
+      itemCount: publicStacks.reduce((total, stack) => total + stack.itemCount, 0),
+      shareImageURL,
+    },
+    stacks: publicStacks.map(({ coverPath: _coverPath, ...stack }) => stack),
+  });
 }
 
 function publicSiteURL(req: Request, path: string): string | null {
@@ -246,7 +267,7 @@ async function loadSharedStack(
 ) {
   const { data: publicStack, error: publicError } = await admin
     .from("stacks")
-    .select("id, owner_id, title, wishlist_mode, visibility")
+    .select("id, owner_id, title, wishlist_mode, visibility, updated_at")
     .eq("id", stackID)
     .eq("visibility", "public")
     .maybeSingle();
@@ -255,7 +276,7 @@ async function loadSharedStack(
   if (!isUUID(linkToken)) return null;
   const { data: linkOnlyStack, error: linkError } = await admin
     .from("stacks")
-    .select("id, owner_id, title, wishlist_mode, visibility")
+    .select("id, owner_id, title, wishlist_mode, visibility, updated_at")
     .eq("id", stackID)
     .eq("visibility", "link_only")
     .eq("public_link_token", linkToken)

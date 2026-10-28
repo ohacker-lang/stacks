@@ -33,6 +33,38 @@ struct SharedStackUniversalLink: Equatable, Sendable {
     }
 }
 
+/// stacks.spot/username and stacks.spot/username/stack-slug: the public
+/// profile pages. Site pages share the same namespace, so they are excluded
+/// here and in the apple-app-site-association file served by web/src/index.js.
+struct PublicProfileUniversalLink: Equatable, Sendable {
+    static let reservedPaths: Set<String> = [
+        "s", "invite", "waitlist", "download", "stacks", "demo", "api", "assets",
+        "terms", "privacy", "security", "support", "affiliate", "privacy-choices",
+        "aliva", ".well-known", "apple-app-site-association",
+    ]
+
+    let username: String
+    let stackSlug: String?
+
+    init?(url: URL) {
+        guard url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == "stacks.spot" else { return nil }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard (1...2).contains(parts.count) else { return nil }
+        let username = parts[0].lowercased()
+        guard !Self.reservedPaths.contains(username),
+              username.range(of: "^[a-z0-9_]{3,30}$", options: .regularExpression) != nil else { return nil }
+        if parts.count == 2 {
+            let slug = parts[1].lowercased()
+            guard slug.range(of: "^[a-z0-9-]{1,80}$", options: .regularExpression) != nil else { return nil }
+            stackSlug = slug
+        } else {
+            stackSlug = nil
+        }
+        self.username = username
+    }
+}
+
 private func withSessionRestoreTimeout<T: Sendable>(
     _ duration: Duration,
     operation: @escaping @Sendable () async throws -> T
@@ -69,6 +101,7 @@ final class AppSession {
     var pendingCollaborationInvite: CollaborationInvitePreview?
     var isAcceptingCollaborationInvite = false
     var pendingSharedStackLink: SharedStackUniversalLink?
+    var pendingProfileLink: PublicProfileUniversalLink?
 
     init(services: AppServices) {
         self.services = services
@@ -229,6 +262,10 @@ final class AppSession {
             pendingSharedStackLink = stackLink
             return
         }
+        if let profileLink = PublicProfileUniversalLink(url: url) {
+            pendingProfileLink = profileLink
+            return
+        }
         // The signed-in shell opens private wishlist links. They are not auth callbacks.
         if url.scheme?.lowercased() == "stacks", url.host?.lowercased() == "wishlist" {
             return
@@ -343,6 +380,10 @@ final class AppSession {
 
     func clearPendingSharedStackLink() {
         pendingSharedStackLink = nil
+    }
+
+    func clearPendingProfileLink() {
+        pendingProfileLink = nil
     }
 
     private func collaborationInviteToken(from url: URL) -> UUID? {

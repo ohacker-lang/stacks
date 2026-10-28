@@ -8,13 +8,18 @@ const stackID = "486c448c-dcb6-4f2f-91d1-1d71419eb7a6";
 const token = "65737075-8e4c-4dd2-af18-1c26cc59cb55";
 const assets = { ASSETS: { fetch: async () => new Response("asset", { status: 200 }) } };
 
-test("association file is direct JSON with only shared routes", async () => {
+test("association file opens Stacks, invites, profiles and boards but not site pages", async () => {
   const response = await worker.fetch(new Request("https://stacks.spot/.well-known/apple-app-site-association"), assets);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/json");
   const body = await response.json();
   assert.equal(body.applinks.details[0].appID, "ZVV8KBVP26.com.owenhackero.stacks");
-  assert.deepEqual(body.applinks.details[0].paths, ["/s/*", "/invite/*"]);
+  const paths = body.applinks.details[0].paths;
+  assert.deepEqual(paths.slice(0, 2), ["/s/*", "/invite/*"]);
+  assert.deepEqual(paths.slice(-2), ["/*", "/*/*"]);
+  for (const page of ["/", "/waitlist", "/stacks", "/privacy", "/terms", "/aliva", "/demo/*"]) {
+    assert.ok(paths.indexOf(`NOT ${page}`) > 1 && paths.indexOf(`NOT ${page}`) < paths.indexOf("/*"), page);
+  }
 });
 
 test("www redirects to the canonical hostname without dropping path or token", async () => {
@@ -376,4 +381,106 @@ test("public feed falls back to code-backed curation when its backend is unavail
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+const itemID = "0d3e7c1a-5b8f-4c2e-9a71-3f6b2d8e4c10";
+const boardStack = {
+  id: stackID,
+  title: "Fall <Fits>",
+  slug: "fall-fits",
+  visibility: "public",
+  updatedAt: new Date().toISOString(),
+  wishlistMode: false,
+  author: { displayName: "Neeha", username: "Neeha", avatarURL: null },
+  items: [{ id: itemID, title: "Samba OG", brand: "adidas", price: 100, currencyCode: "USD", buyURL: "https://www.adidas.com/us/samba", imageURL: "https://example.supabase.co/signed/samba.png" }],
+};
+
+test("every account gets a profile page, even with no public Stacks", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ profile: { displayName: "Neeha", username: "neeha", bio: "", avatarURL: null, stackCount: 0, itemCount: 0 }, stacks: [] });
+  try {
+    const response = await worker.fetch(new Request("https://stacks.spot/neeha"), assets);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /No public Stacks yet/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/stacks\.spot\/neeha">/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("profile boards link by username and slug, falling back to IDs for duplicate titles", async () => {
+  const otherID = "7f1c2b3a-4d5e-4f60-8a71-b2c3d4e5f607";
+  const thirdID = "8a2d3c4b-5e6f-4a71-9b82-c3d4e5f60718";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({
+    profile: { displayName: "Neeha", username: "neeha", bio: "Things I love", avatarURL: null, shareImageURL: "https://example.supabase.co/signed/cover.png" },
+    stacks: [
+      { id: stackID, title: "Fall Fits", slug: "fall-fits", itemCount: 3, images: ["https://example.supabase.co/a.png", "javascript:alert(1)"], wishlistMode: false },
+      { id: otherID, title: "Lamps", slug: "lamps", itemCount: 1, images: [], wishlistMode: true },
+      { id: thirdID, title: "Lamps", slug: "lamps", itemCount: 0, images: [], wishlistMode: false },
+    ],
+  });
+  try {
+    const html = await (await worker.fetch(new Request("https://stacks.spot/neeha"), assets)).text();
+    assert.match(html, /href="\/neeha\/fall-fits"/);
+    assert.match(html, new RegExp(`href="/s/${otherID}"`));
+    assert.match(html, new RegExp(`href="/s/${thirdID}"`));
+    assert.match(html, /<strong>3<\/strong> Stacks · <strong>4<\/strong> finds/);
+    assert.match(html, /Wishlist/);
+    assert.match(html, /og:image" content="https:\/\/example\.supabase\.co\/signed\/cover\.png"/);
+    assert.doesNotMatch(html, /javascript:/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a public board renders as escaped pins with a canonical username URL", async () => {
+  const originalFetch = globalThis.fetch;
+  let requested;
+  globalThis.fetch = async (url, options) => {
+    requested = { url: url.toString(), accept: options.headers.Accept };
+    return Response.json({ stack: boardStack });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://stacks.spot/neeha/fall-fits"), assets);
+    assert.equal(response.status, 200);
+    assert.match(requested.url, /stackUsername=neeha/);
+    assert.match(requested.url, /stackSlug=fall-fits/);
+    assert.equal(requested.accept, "application/json");
+    const html = await response.text();
+    assert.match(html, /Fall &lt;Fits&gt;/);
+    assert.match(html, new RegExp(`href="/s/${stackID}/p/${itemID}"`));
+    assert.match(html, /\$100/);
+    assert.match(html, /href="https:\/\/stacks\.spot\/neeha\/fall-fits"/);
+    assert.match(html, /href="\/neeha"/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("wishlist boards keep the claim-enabled preview page", async () => {
+  const originalFetch = globalThis.fetch;
+  const accepts = [];
+  globalThis.fetch = async (url, options) => {
+    accepts.push(options.headers.Accept);
+    return options.headers.Accept === "application/json"
+      ? Response.json({ stack: { ...boardStack, wishlistMode: true } })
+      : new Response("<html><head></head><body>Claim a gift</body></html>");
+  };
+  try {
+    const html = await (await worker.fetch(new Request(`https://stacks.spot/s/${stackID}`), assets)).text();
+    assert.deepEqual(accepts, ["application/json", "text/html"]);
+    assert.match(html, /Claim a gift/);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a pin page shows the find and only follows https buy links", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ stack: { ...boardStack, items: [{ ...boardStack.items[0] }, { ...boardStack.items[0], id: stackID, buyURL: "http://insecure.example" }] } });
+  try {
+    const pin = await worker.fetch(new Request(`https://stacks.spot/s/${stackID}/p/${itemID}`), assets);
+    assert.equal(pin.status, 200);
+    const html = await pin.text();
+    assert.match(html, /View at adidas\.com/);
+    assert.match(html, /Samba OG/);
+    const insecure = await (await worker.fetch(new Request(`https://stacks.spot/s/${stackID}/p/${stackID}`), assets)).text();
+    assert.doesNotMatch(insecure, /insecure\.example/);
+    const missing = await worker.fetch(new Request(`https://stacks.spot/s/${stackID}/p/7f1c2b3a-4d5e-4f60-8a71-b2c3d4e5f607`), assets);
+    assert.equal(missing.status, 404);
+  } finally { globalThis.fetch = originalFetch; }
 });
