@@ -1035,8 +1035,10 @@ private struct ProfileSettingsSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Stacks Pro") {
-                    settingsRow(isPro ? "Manage Stacks Pro" : "Get Pro", symbol: "sparkles", action: onPro)
+                Section(StacksPro.isEnabled ? "Stacks Pro" : "Price tracking") {
+                    if StacksPro.isEnabled {
+                        settingsRow(isPro ? "Manage Stacks Pro" : "Get Pro", symbol: "sparkles", action: onPro)
+                    }
                     NavigationLink {
                         PriceAlertsSettingsView()
                     } label: {

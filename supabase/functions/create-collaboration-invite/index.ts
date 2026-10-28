@@ -33,14 +33,9 @@ serve(async (req) => {
     }
 
     const admin = serviceClient();
-    const { data: entitlement, error: entitlementError } = await admin
-      .from("pro_entitlements")
-      .select("expires_at, revoked_at")
-      .eq("user_id", stack.owner_id)
-      .maybeSingle();
+    const { data: isPro, error: entitlementError } = await admin
+      .rpc("user_has_pro", { target_user: stack.owner_id });
     if (entitlementError) throw entitlementError;
-    const isPro = entitlement && !entitlement.revoked_at &&
-      new Date(entitlement.expires_at).getTime() > Date.now();
     if (!isPro) {
       const [{ count: collaborators, error: collaboratorsError }, { count: pendingInvites, error: invitesError }] =
         await Promise.all([
