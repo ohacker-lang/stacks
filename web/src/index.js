@@ -233,7 +233,7 @@ function associationFile() {
     applinks: {
       apps: [],
       details: [{
-        appID: "ZVV8KBVP26.com.owenhackero.stacks",
+        appID: "24H7V96T4Q.spot.stacks.app",
         // Site pages share the /username namespace, so exclude them before the
         // profile wildcards. Mirrors PublicProfileUniversalLink in the app.
         paths: [

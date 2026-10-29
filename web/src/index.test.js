@@ -13,7 +13,7 @@ test("association file opens Stacks, invites, profiles and boards but not site p
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/json");
   const body = await response.json();
-  assert.equal(body.applinks.details[0].appID, "ZVV8KBVP26.com.owenhackero.stacks");
+  assert.equal(body.applinks.details[0].appID, "24H7V96T4Q.spot.stacks.app");
   const paths = body.applinks.details[0].paths;
   assert.deepEqual(paths.slice(0, 2), ["/s/*", "/invite/*"]);
   assert.deepEqual(paths.slice(-2), ["/*", "/*/*"]);

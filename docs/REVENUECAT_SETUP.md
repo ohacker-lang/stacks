@@ -33,7 +33,7 @@ paywall/Terms/Privacy links on a real device.
 1. Confirm the RevenueCat account email and use a project role that can add app configurations.
 2. Complete Apple's Paid Apps Agreement, tax and banking setup, and create the two
    auto-renewable subscriptions in one App Store Connect group for bundle ID
-   `com.owenhackero.stacks`: `stacks.pro.monthly` at **$2.99/month** and
+   `spot.stacks.app`: `stacks.pro.monthly` at **$2.99/month** and
    `stacks.pro.annual` at **$14.99/year**. Configure equivalent regional tiers in
    App Store Connect; RevenueCat and the app must display Apple's localized price.
 3. Create the iOS App Store configuration in RevenueCat and import those subscriptions.
@@ -63,7 +63,7 @@ paywall/Terms/Privacy links on a real device.
 10. Price alerts use `202610040001_price_alerts.sql`, `price-alerts`, and the hourly Cloudflare
     Cron trigger in `web/wrangler.toml`; individual products are checked approximately daily.
     Configure the Supabase secrets `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`, and
-    `APNS_BUNDLE_ID=com.owenhackero.stacks` before enabling notifications on production devices.
+    `APNS_BUNDLE_ID=spot.stacks.app` before enabling notifications on production devices.
     `APNS_PRIVATE_KEY` must be the contents of Apple's `.p8` key and must never be committed.
     The app remains useful without notification authorization: alert history and current status
     are visible in Profile > Settings > Price Alerts.
