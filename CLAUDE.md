@@ -18,7 +18,10 @@ Follow its "How We Work" page. In short:
    **In review**. Never move a story to Done (Neeha does that after merging).
 4. If something is unclear or out of scope, comment on the story and stop.
 5. Work that wasn't a story yet (bugs found along the way, follow-ups): add a
-   Backlog story with acceptance criteria, Status = Backlog, so Neeha can triage.
+   Backlog story with Status = Backlog so Neeha can triage. Every story needs
+   a **User story** ("As a [type of user], I want [goal], so that [benefit].",
+   written for whoever benefits: shopper, friend, App Store visitor, reviewer
+   or the team) and testable **Acceptance criteria**.
 6. Record product or architecture decisions in **Decision Log**, and update
    **Engineering Docs → Architecture** when schema, environments or setup change.
 7. Keep Notion current as you go — whenever a PR is opened or a story's state
