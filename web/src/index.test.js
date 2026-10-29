@@ -33,7 +33,7 @@ test("a shared Stack is fetched from Supabase and uses branded legal links", asy
   let upstream;
   globalThis.fetch = async (requestURL, options) => {
     upstream = { url: requestURL.toString(), accept: options.headers.Accept, proxy: options.headers["X-Stacks-Web-Proxy"], redirect: options.redirect };
-    return new Response('<html><head></head><body><a href="https://iuovmgjcfwgwozfnsdgf.supabase.co/functions/v1/web-preview?page=privacy">Privacy</a></body></html>');
+    return new Response('<html><head></head><body><a href="https://whyufyttlvpiwlunosjm.supabase.co/functions/v1/web-preview?page=privacy">Privacy</a></body></html>');
   };
   try {
     const response = await worker.fetch(new Request(`https://stacks.spot/s/${stackID}?token=${token}`), assets);

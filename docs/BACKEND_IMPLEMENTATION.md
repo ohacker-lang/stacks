@@ -21,14 +21,14 @@ controls, affiliate click records, and private media storage. Read
 
 ### Development environment
 
-- Supabase project reference: `iuovmgjcfwgwozfnsdgf`
-- Project URL: `https://iuovmgjcfwgwozfnsdgf.supabase.co`
+- Supabase project reference: `whyufyttlvpiwlunosjm`
+- Project URL: `https://whyufyttlvpiwlunosjm.supabase.co`
 - Database password, service-role key, provider credentials, and edge-function secrets must never be committed or sent in chat.
 
 ## Deploy Order
 
 1. Create separate Supabase **development**, **staging**, and **production** projects.
-2. Install the Supabase CLI and run `supabase link --project-ref iuovmgjcfwgwozfnsdgf` from this repository.
+2. Install the Supabase CLI and run `supabase link --project-ref whyufyttlvpiwlunosjm` from this repository.
 3. Review the migration in the Supabase SQL editor, then run `supabase db push` against development.
 4. Enable Apple and email authentication in Supabase Auth. Configure the iOS bundle ID, redirect URLs, and Apple provider credentials.
 5. Create the private `stack-media` bucket through the migration. Do not make product photos public.

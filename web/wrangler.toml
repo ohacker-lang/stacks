@@ -23,9 +23,9 @@ binding = "ASSETS"
 run_worker_first = true
 
 [vars]
-SUPABASE_URL = "https://iuovmgjcfwgwozfnsdgf.supabase.co"
+SUPABASE_URL = "https://whyufyttlvpiwlunosjm.supabase.co"
 # This is the public client key also embedded in the iOS app, not a service-role key.
-SUPABASE_PUBLISHABLE_KEY = "sb_publishable_hD4djOAlXSKPZHDqLh90zg_147MUcM7"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_RQbjbTyZfihfhNeleKx54Q_csEprpXW"
 # PostHog project API key (phc_…, public). Empty = /analytics.js does nothing.
-POSTHOG_KEY = ""
+POSTHOG_KEY = "phc_n3ykcY2JRLNRmBKqWdKDsj4BdCLoxPYpwAogGLqYBMsL"
 POSTHOG_HOST = "https://us.i.posthog.com"

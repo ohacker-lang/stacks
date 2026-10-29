@@ -1,7 +1,7 @@
 import { curatedProfile, curatedStacks } from "./curated.js";
 
 const publicOrigin = "https://stacks.spot";
-const supabasePreview = "https://iuovmgjcfwgwozfnsdgf.supabase.co/functions/v1/web-preview";
+const supabasePreview = "https://whyufyttlvpiwlunosjm.supabase.co/functions/v1/web-preview";
 const policyPages = new Set([
   "terms", "privacy", "security", "support", "affiliate", "privacy-choices",
 ]);
@@ -141,7 +141,7 @@ function localizeHTML(html) {
   return html
     .replaceAll("trystacks@gmail.com", "support@stacks.spot")
     .replace(/href="\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
-    .replace(/href="https:\/\/iuovmgjcfwgwozfnsdgf\.supabase\.co\/functions\/v1\/web-preview\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
+    .replace(/href="https:\/\/whyufyttlvpiwlunosjm\.supabase\.co\/functions\/v1\/web-preview\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
     .replace("</head>", '<link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head>')
     .replace("<nav><strong>Stacks</strong>", '<nav><a class="legal-wordmark" href="/">Stacks</a>')
     .replace("<span>For iPhone · coming soon</span>", '<a class="get-app" href="/waitlist">Claim your username</a>')

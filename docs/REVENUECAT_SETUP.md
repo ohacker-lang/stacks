@@ -58,7 +58,7 @@ paywall/Terms/Privacy links on a real device.
 8. Migration `202609210003_revenuecat_entitlements.sql` is applied. The deployed
    `sync-pro-entitlement` and `revenuecat-webhook` now read `stacks_pro`.
 9. In RevenueCat, create production and sandbox webhooks pointing to
-   `https://iuovmgjcfwgwozfnsdgf.supabase.co/functions/v1/revenuecat-webhook` and use the exact
+   `https://whyufyttlvpiwlunosjm.supabase.co/functions/v1/revenuecat-webhook` and use the exact
    configured Authorization header.
 10. Price alerts use `202610040001_price_alerts.sql`, `price-alerts`, and the hourly Cloudflare
     Cron trigger in `web/wrangler.toml`; individual products are checked approximately daily.
