@@ -1,5 +1,7 @@
 # Stacks Product Requirements Document
 
+> **Notion is the source of truth.** The current, corrected version of this document lives in Notion: [Stacks V1 – Product requirements](https://app.notion.com/p/40858338d84581ec8b4ed9c6063655ab). This file is the original import and may be out of date (for example, new Stacks are now public by default, sign-in includes Google, Stacks Pro is paused and price alerts are in scope). Update Notion first.
+
 **Status:** Draft for review  
 **Product:** Stacks  
 **Platform:** iOS 18+  

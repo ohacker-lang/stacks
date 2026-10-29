@@ -1,5 +1,7 @@
 # Stacks release gates
 
+> **Notion is the source of truth.** The current, corrected version of this document lives in Notion: [Launch & Compliance](https://app.notion.com/p/40858338d845819b8ae3daadd5fc2602). This file is the original import and may be out of date (for example, new Stacks are now public by default, sign-in includes Google, Stacks Pro is paused and price alerts are in scope). Update Notion first.
+
 This is a release checklist, not a statement that the app is approved or legally reviewed.
 Do not select **All Countries or Regions** until every gate below is complete.
 

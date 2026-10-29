@@ -1,5 +1,7 @@
 # RevenueCat launch setup
 
+> **Parked (October 2026).** Stacks Pro is paused for launch: `StacksPro.isEnabled = false` in the app and migration `202610280001` makes `user_has_pro` return true on the server, so no limits apply. Release builds may ship without a RevenueCat key while Pro is paused. The steps below are kept for turning Pro back on; the short checklist is in Notion (Engineering Docs → Stacks Pro & RevenueCat). Bundle ID is now `spot.stacks.app` and the Supabase project is `whyufyttlvpiwlunosjm`.
+
 The app is wired for RevenueCat but intentionally contains no private RevenueCat credentials.
 
 ## Verified release blockers (September 26, 2026)

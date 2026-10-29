@@ -1,5 +1,7 @@
 # Stacks To Do
 
+> **Replaced by the Notion Backlog.** Open work is tracked in [📋 Backlog](https://app.notion.com/p/8220d2ddafa143dbb77087fb364c3399). This list is historical: product search is now hidden for launch, so the SerpApi steps below are not current priorities.
+
 ## Remaining Provider Setup
 
 - [ ] Create a free SerpApi account and generate an API key. Do not add the key to Xcode or Git.

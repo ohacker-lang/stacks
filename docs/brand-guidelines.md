@@ -1,5 +1,7 @@
 # Stacks Brand and UI Guidelines
 
+> **Notion is the source of truth.** The current, corrected version of this document lives in Notion: [Brand & Design](https://app.notion.com/p/40858338d84581f1ba2cf9ae0426a854). This file is the original import and may be out of date (for example, new Stacks are now public by default, sign-in includes Google, Stacks Pro is paused and price alerts are in scope). Update Notion first.
+
 ## 1. The Idea
 
 **Stacks is the calm, editorial home for things worth keeping.** It makes saving a product feel tactile and personal: an object lands on a clean white page, joins a collection, and becomes easy to share. The interface should feel closer to a great independent magazine or a beautifully arranged bedside table than a shopping feed.
