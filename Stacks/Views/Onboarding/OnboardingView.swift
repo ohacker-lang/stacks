@@ -217,6 +217,9 @@ struct OnboardingView: View {
                 .presentationBackground(.ultraThinMaterial)
             }
         }
+        .task(id: onboardingStepName) {
+            Analytics.capture("onboarding_step_viewed", ["step": onboardingStepName])
+        }
         .fullScreenCover(isPresented: $isShowingProPaywall, onDismiss: finishOnboarding) {
             StacksProPaywall()
         }
@@ -471,6 +474,7 @@ struct OnboardingView: View {
             case .name:
                 FirstStackNameQuestion(
                     title: $firstStackTitle,
+                    author: onboardingProfile,
                     namespace: firstStackCanvasNamespace,
                     onContinue: { advanceFirstStackStep(to: .addProduct) }
                 )
@@ -479,6 +483,7 @@ struct OnboardingView: View {
             case .addProduct:
                 FirstStackAddProductCoach(
                     title: resolvedFirstStackTitle,
+                    author: onboardingProfile,
                     namespace: firstStackCanvasNamespace,
                     onAdd: beginCameraReveal
                 )
@@ -504,6 +509,10 @@ struct OnboardingView: View {
                 .background(Color.white.ignoresSafeArea())
             }
         }
+    }
+
+    private var onboardingStepName: String {
+        stage == .firstStack ? "firstStack.\(firstStackStep)" : "\(stage)"
     }
 
     private var resolvedFirstStackTitle: String {
@@ -1078,6 +1087,7 @@ private struct FirstStackPurposeQuestion: View {
 
 private struct FirstStackNameQuestion: View {
     @Binding var title: String
+    let author: UserProfile?
     let namespace: Namespace.ID
     let onContinue: () -> Void
 
@@ -1090,6 +1100,7 @@ private struct FirstStackNameQuestion: View {
             ZStack(alignment: .bottom) {
                 EmptyStackNameCanvas(
                     title: $title,
+                    author: author,
                     namespace: namespace,
                     titleTopInset: proxy.safeAreaInsets.top + 56
                 )
@@ -1111,6 +1122,7 @@ private struct FirstStackNameQuestion: View {
 
 private struct FirstStackAddProductCoach: View {
     let title: String
+    let author: UserProfile?
     let namespace: Namespace.ID
     let onAdd: () -> Void
     @State private var isPulsing = false
@@ -1120,6 +1132,7 @@ private struct FirstStackAddProductCoach: View {
             ZStack(alignment: .topTrailing) {
                 EmptyStackNameCanvas(
                     title: .constant(title),
+                    author: author,
                     namespace: namespace,
                     titleTopInset: proxy.safeAreaInsets.top + 56
                 )
@@ -1190,6 +1203,8 @@ private struct OnboardingStackChrome: View {
 
 private struct EmptyStackNameCanvas: View {
     @Binding var title: String
+    /// The signed-in person, shown as the Stack's byline once their profile loads.
+    let author: UserProfile?
     let namespace: Namespace.ID
     let titleTopInset: CGFloat
 
@@ -1260,16 +1275,15 @@ private struct EmptyStackNameCanvas: View {
 
                 VStack(spacing: 8) {
                     HStack(spacing: 7) {
-                        Circle()
-                            .fill(Color.stacksInk.opacity(0.78))
-                            .frame(width: 22, height: 22)
-                            .overlay {
-                                Text("M")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.white)
-                            }
+                        if let author {
+                            AvatarView(profile: author, size: 22)
+                        } else {
+                            Circle()
+                                .fill(Color.stacksInk.opacity(0.12))
+                                .frame(width: 22, height: 22)
+                        }
 
-                        Text("Maya Ellis")
+                        Text(author?.displayName ?? "You")
                             .font(.system(size: 14, weight: .medium, design: .default))
                             .foregroundStyle(Color.stacksInk.opacity(0.78))
 
@@ -1359,26 +1373,44 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
         field.textAlignment = .left
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.tintColor = UIColor(Color.stacksInk)
+        field.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
 
         return field
     }
 
     func updateUIView(_ field: UITextField, context: Context) {
-        if field.text != text { field.text = text }
-        field.font = .systemFont(ofSize: fontSize, weight: .bold)
-        field.textColor = textColor
-        field.tintColor = UIColor(Color.stacksInk)
-        field.textAlignment = .left
+        // Only write the binding back into the field when it changed from
+        // outside (for example a reset). Rewriting it on every update threw
+        // away characters that autocorrect, predictive text or fast typing
+        // had inserted since the last sync, so "Fall fits" saved as "Fall".
+        if text != context.coordinator.lastSyncedText {
+            context.coordinator.lastSyncedText = text
+            if field.text != text { field.text = text }
+        }
+        // Re-applying text attributes while typing also disturbs editing, so
+        // only do it when the size or colour actually changes.
+        let style = Style(fontSize: fontSize, textColor: textColor)
+        guard context.coordinator.appliedStyle != style else { return }
+        context.coordinator.appliedStyle = style
         field.defaultTextAttributes = [
             .font: UIFont.systemFont(ofSize: fontSize, weight: .bold),
-            .kern: fontSize * OnboardingEditableTitleMetrics.trackingRatio
+            .kern: fontSize * OnboardingEditableTitleMetrics.trackingRatio,
+            .foregroundColor: textColor
         ]
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
 
+    struct Style: Equatable {
+        let fontSize: CGFloat
+        let textColor: UIColor
+    }
+
     final class Coordinator: NSObject, UITextFieldDelegate {
         @Binding private var text: String
+        var lastSyncedText = ""
+        var appliedStyle: Style?
 
         init(text: Binding<String>) { _text = text }
 
@@ -1387,15 +1419,12 @@ private struct ExactCaseStackTitleField: UIViewRepresentable {
             return true
         }
 
-        func textField(
-            _ textField: UITextField,
-            shouldChangeCharactersIn range: NSRange,
-            replacementString string: String
-        ) -> Bool {
-            let current = textField.text ?? ""
-            guard let swiftRange = Range(range, in: current) else { return false }
-            text = current.replacingCharacters(in: swiftRange, with: string)
-            return true
+        /// Fires after UIKit has applied every kind of edit, including
+        /// autocorrect and predictive text, so the binding always matches.
+        @objc func editingChanged(_ textField: UITextField) {
+            let value = textField.text ?? ""
+            lastSyncedText = value
+            text = value
         }
     }
 }
@@ -2080,11 +2109,7 @@ private struct PhysicsExplainerScreen: View {
                         PrimaryButton(title: primaryTitle, systemImage: "arrow.right", action: onPrimary)
                             .disabled(isPrimaryDisabled)
 
-                        Button("Skip") {
-                            onSkip()
-                        }
-                        .font(.stacksText(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.stacksMutedInk)
+                        OnboardingSkipButton(action: onSkip)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, max(28, proxy.safeAreaInsets.bottom + 12))
@@ -2095,6 +2120,25 @@ private struct PhysicsExplainerScreen: View {
         }
     }
 
+}
+
+/// Products fall behind these pages, so plain grey text was unreadable over
+/// them. A frosted pill keeps Skip legible on any artwork.
+private struct OnboardingSkipButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Skip")
+                .font(.stacksText(size: 16, weight: .semibold))
+                .foregroundStyle(Color.stacksInk.opacity(0.72))
+                .padding(.horizontal, 22)
+                .frame(minHeight: 40)
+                .stacksGlass(cornerRadius: 20, interactive: true)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 private struct SharedStackPreview: View {
@@ -2303,7 +2347,7 @@ private struct LinkSaveDemo: View {
                 HStack(spacing: 6) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 9, weight: .medium))
-                    Text("newamsterdamsurf.com/products/logo-hoodie-ash")
+                    Text("newamsterdamsurf.com/products/windbreaker-blue")
                         .font(.stacksText(size: 11, weight: .medium))
                         .lineLimit(1)
                 }
@@ -2735,11 +2779,7 @@ private struct ExplainerScreen<Visual: View>: View {
 
                 VStack(spacing: 12) {
                     PrimaryButton(title: primaryTitle, systemImage: "arrow.right", action: onPrimary)
-                    Button("Skip") {
-                        onSkip()
-                    }
-                    .font(.stacksText(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.stacksMutedInk)
+                    OnboardingSkipButton(action: onSkip)
                 }
                 .frame(width: max(1, proxy.size.width - 48))
                 .padding(.bottom, 28)
@@ -2849,7 +2889,7 @@ private struct MagneticStackingField: View {
         let definitions = assets.map { ($0, $0.burstSize, $0.burstRotation) }
 
         let copies = max(1, min(burstMultiplier, 4))
-        particles = (0 ..< copies).flatMap { copy in
+        particles = (0 ..< copies).flatMap { (copy: Int) -> [OnboardingPhysicsParticle] in
             let copyOffset = CGFloat(copy) - CGFloat(copies - 1) / 2
             let copyScale = max(0.66, 1 - CGFloat(copy) * 0.10)
             let cannon = CGPoint(
@@ -2857,12 +2897,11 @@ private struct MagneticStackingField: View {
                 y: size.height * 0.5
             )
 
-            return definitions.enumerated().map { index, definition in
+            return definitions.enumerated().map { (index: Int, definition) -> OnboardingPhysicsParticle in
                 let indexOffset = CGFloat(index - 4)
-                let angle = (CGFloat(index) / CGFloat(max(1, definitions.count))) * .pi * 2
-                    - .pi / 2
-                    + copyOffset * 0.16
-                let speed = 640 + CGFloat(index % 3) * 90 + abs(copyOffset) * 70
+                let fraction: CGFloat = CGFloat(index) / CGFloat(max(1, definitions.count))
+                let angle: CGFloat = fraction * .pi * 2 - .pi / 2 + copyOffset * 0.16
+                let speed: CGFloat = 640 + CGFloat(index % 3) * 90 + abs(copyOffset) * 70
                 return OnboardingPhysicsParticle(
                     asset: definition.0,
                     size: definition.1 * scale * copyScale,

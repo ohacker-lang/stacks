@@ -992,7 +992,7 @@ struct ProductLinkImportSheet: View {
             return try await services.stacks.createStack(
                 title: newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 wishlistMode: newStackWishlistMode,
-                visibility: .private,
+                visibility: StackVisibility.defaultForNewStacks,
                 owner: user
             )
         }
@@ -2381,7 +2381,7 @@ struct PhotoProductImportSheet: View {
             return try await services.stacks.createStack(
                 title: newStackTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                 wishlistMode: newStackWishlistMode,
-                visibility: .private,
+                visibility: StackVisibility.defaultForNewStacks,
                 owner: user
             )
         }

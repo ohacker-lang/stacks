@@ -61,7 +61,7 @@ The principal UI files are:
 
 ### Supabase foundation
 
-The development project ref is `hpjiphvgmhvvvfxkunwb`. Its URL and a **public anon/publishable client key** are presently configured in Debug and Release build settings. This is normal for a Supabase client; it is not a service-role credential. Never add a service-role key, Apple private key, SerpApi key, Sovrn secret, database password, or OAuth private credential to the Xcode project, Git, or a chat transcript.
+The Supabase project ref is `whyufyttlvpiwlunosjm` (created October 2026; it replaces the earlier `iuovmgjcfwgwozfnsdgf` and `hpjiphvgmhvvvfxkunwb` projects). Its URL and a **public anon/publishable client key** are presently configured in Debug and Release build settings. This is normal for a Supabase client; it is not a service-role credential. Never add a service-role key, Apple private key, SerpApi key, Sovrn secret, database password, or OAuth private credential to the Xcode project, Git, or a chat transcript.
 
 Applied migrations:
 

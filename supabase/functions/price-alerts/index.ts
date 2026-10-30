@@ -72,9 +72,8 @@ serve(async (req) => {
       return jsonResponse({ error: "Enter a target price greater than zero." }, 400);
     }
 
-    const { data: entitlement } = await admin.from("pro_entitlements").select("expires_at, revoked_at")
-      .eq("user_id", context.user.id).gt("expires_at", new Date().toISOString()).is("revoked_at", null).maybeSingle();
-    const limit = entitlement ? 25 : 1;
+    const { data: hasPro } = await admin.rpc("user_has_pro", { target_user: context.user.id });
+    const limit = hasPro ? 25 : 1;
     const { count } = await admin.from("price_alerts").select("id", { count: "exact", head: true })
       .eq("user_id", context.user.id).in("status", ["active", "temporarily_unavailable"])
       .neq("stack_item_id", itemID);

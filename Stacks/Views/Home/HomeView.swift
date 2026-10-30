@@ -706,7 +706,7 @@ private struct CreateStackSheet: View {
                 ) {
                     withAnimation(.snappy) {
                         viewModel.createWishlistMode = false
-                        viewModel.createVisibility = .private
+                        viewModel.createVisibility = .defaultForNewStacks
                     }
                 }
 
@@ -732,6 +732,16 @@ private struct CreateStackSheet: View {
             subtitle: "Choose how people can see this Stack. You can change this later in Settings."
         ) {
             VStack(spacing: 12) {
+                CreateStackChoiceCard(
+                    title: "Everyone",
+                    detail: "It shows on your profile at stacks.spot/\(user.username.lowercased()).",
+                    symbol: nil,
+                    centersContent: true,
+                    isSelected: viewModel.createVisibility == .publicDiscover
+                ) {
+                    viewModel.createVisibility = .publicDiscover
+                }
+
                 CreateStackChoiceCard(
                     title: "Anyone with the link",
                     detail: viewModel.createWishlistMode
@@ -818,7 +828,9 @@ private struct CreateStackSheet: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.stacksInk)
 
-                Text(viewModel.createVisibility == .publicLink
+                Text(viewModel.createVisibility == .publicDiscover
+                     ? "On your public profile"
+                     : viewModel.createVisibility == .publicLink
                      ? "Anyone with the link"
                      : "Only you and your Collab")
                     .font(.system(size: 14))

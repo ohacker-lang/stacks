@@ -33,6 +33,38 @@ struct SharedStackUniversalLink: Equatable, Sendable {
     }
 }
 
+/// stacks.spot/username and stacks.spot/username/stack-slug: the public
+/// profile pages. Site pages share the same namespace, so they are excluded
+/// here and in the apple-app-site-association file served by web/src/index.js.
+struct PublicProfileUniversalLink: Equatable, Sendable {
+    static let reservedPaths: Set<String> = [
+        "s", "invite", "waitlist", "download", "stacks", "demo", "api", "assets",
+        "terms", "privacy", "security", "support", "affiliate", "privacy-choices",
+        "aliva", ".well-known", "apple-app-site-association",
+    ]
+
+    let username: String
+    let stackSlug: String?
+
+    init?(url: URL) {
+        guard url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == "stacks.spot" else { return nil }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard (1...2).contains(parts.count) else { return nil }
+        let username = parts[0].lowercased()
+        guard !Self.reservedPaths.contains(username),
+              username.range(of: "^[a-z0-9_]{3,30}$", options: .regularExpression) != nil else { return nil }
+        if parts.count == 2 {
+            let slug = parts[1].lowercased()
+            guard slug.range(of: "^[a-z0-9-]{1,80}$", options: .regularExpression) != nil else { return nil }
+            stackSlug = slug
+        } else {
+            stackSlug = nil
+        }
+        self.username = username
+    }
+}
+
 private func withSessionRestoreTimeout<T: Sendable>(
     _ duration: Duration,
     operation: @escaping @Sendable () async throws -> T
@@ -69,6 +101,7 @@ final class AppSession {
     var pendingCollaborationInvite: CollaborationInvitePreview?
     var isAcceptingCollaborationInvite = false
     var pendingSharedStackLink: SharedStackUniversalLink?
+    var pendingProfileLink: PublicProfileUniversalLink?
 
     init(services: AppServices) {
         self.services = services
@@ -156,6 +189,7 @@ final class AppSession {
             let session = try await services.auth.signInWithApple()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
             state = .onboarding(session)
+            Analytics.capture("signed_in", ["method": "apple", "is_new_user": !session.hasCompletedOnboarding])
             SharedStackDestinationStore.clear()
             lastError = nil
             services.haptics.notification(.success)
@@ -177,6 +211,7 @@ final class AppSession {
             let session = try await services.auth.signInWithGoogle()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
             state = .onboarding(session)
+            Analytics.capture("signed_in", ["method": "google", "is_new_user": !session.hasCompletedOnboarding])
             SharedStackDestinationStore.clear()
             lastError = nil
             services.haptics.notification(.success)
@@ -200,6 +235,7 @@ final class AppSession {
             case .authenticated(let session):
                 try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
                 state = .onboarding(session)
+                Analytics.capture("signed_in", ["method": "email", "is_new_user": !session.hasCompletedOnboarding])
                 SharedStackDestinationStore.clear()
                 pendingEmailSignIn = false
             case .linkSent:
@@ -229,6 +265,10 @@ final class AppSession {
             pendingSharedStackLink = stackLink
             return
         }
+        if let profileLink = PublicProfileUniversalLink(url: url) {
+            pendingProfileLink = profileLink
+            return
+        }
         // The signed-in shell opens private wishlist links. They are not auth callbacks.
         if url.scheme?.lowercased() == "stacks", url.host?.lowercased() == "wishlist" {
             return
@@ -241,6 +281,7 @@ final class AppSession {
             }
             pendingEmailSignIn = false
             lastError = nil
+            Analytics.capture("signed_in", ["method": "email", "is_new_user": !authSession.hasCompletedOnboarding])
             if authSession.hasCompletedOnboarding {
                 let profile = try await services.profiles.currentProfile(for: authSession)
                 if SharedStackDestinationStore.ownerID != profile.id {
@@ -270,6 +311,7 @@ final class AppSession {
             let profile = try await services.profiles.currentProfile(for: completed)
             SharedStackDestinationStore.clear()
             state = .signedIn(profile)
+            Analytics.capture("onboarding_completed")
             Self.cache(profile: profile)
             await preparePendingCollaborationInviteIfPossible()
             pendingEmailSignIn = false
@@ -287,6 +329,7 @@ final class AppSession {
     func signOut() async {
         do {
             try await services.auth.signOut()
+            Analytics.capture("signed_out")
             state = .signedOut
             Self.cache(profile: nil)
             SharedStackDestinationStore.clear()
@@ -345,6 +388,10 @@ final class AppSession {
         pendingSharedStackLink = nil
     }
 
+    func clearPendingProfileLink() {
+        pendingProfileLink = nil
+    }
+
     private func collaborationInviteToken(from url: URL) -> UUID? {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         if url.scheme?.lowercased() == "stacks", url.host?.lowercased() == "invite",
@@ -378,6 +425,7 @@ final class AppSession {
     func requestAccountDeletion() async -> Bool {
         do {
             try await services.auth.requestAccountDeletion()
+            Analytics.capture("account_deleted")
             state = .signedOut
             Self.cache(profile: nil)
             SharedStackDestinationStore.clear()

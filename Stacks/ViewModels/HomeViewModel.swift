@@ -10,7 +10,7 @@ final class HomeViewModel {
     var errorMessage: String?
     var createTitle = ""
     var createWishlistMode = true
-    var createVisibility: StackVisibility = .private
+    var createVisibility: StackVisibility = .defaultForNewStacks
 
     func load(services: AppServices, user: UserProfile) async {
         isLoading = true
@@ -54,7 +54,7 @@ final class HomeViewModel {
             NotificationCenter.default.post(name: .stacksShareDestinationsDidChange, object: nil)
             createTitle = ""
             createWishlistMode = true
-            createVisibility = .private
+            createVisibility = .defaultForNewStacks
             services.haptics.notification(.success)
             return stack
         } catch {

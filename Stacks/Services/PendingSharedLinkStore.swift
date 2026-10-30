@@ -93,7 +93,7 @@ struct SharedStackDestination: Identifiable, Codable, Equatable, Sendable {
 }
 
 enum SharedImportConfiguration {
-    static let appGroupID = "group.com.owenhackero.stacks"
+    static let appGroupID = "group.spot.stacks.app"
     static let pendingLinkKey = "stacks.pendingSharedLink"
     static let destinationsKey = "stacks.shareDestinations"
     static let callbackURL = URL(string: "stacks://shared-link")!

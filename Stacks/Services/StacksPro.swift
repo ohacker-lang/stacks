@@ -42,10 +42,14 @@ final class StacksPro {
     static let freeCollaboratorLimit = 3
     static let freePriceAlertLimit = 1
     static let proPriceAlertLimit = 25
+    /// While Stacks Pro is paused, RevenueCat is never configured, no paywall
+    /// is shown, and every account gets Pro limits. The backend mirrors this
+    /// in `user_has_pro` / `stack_owner_has_pro` (migration 202610280001).
+    static let isEnabled = false
 
     private(set) var packages: [Package] = []
     private(set) var currentOffering: Offering?
-    private(set) var isPro = false
+    private(set) var isPro = !StacksPro.isEnabled
     private(set) var isBusy = false
     private(set) var isConfigured = false
     private(set) var isAccountLinked = false
@@ -68,7 +72,7 @@ final class StacksPro {
     }
 
     func configure() {
-        guard !isConfigured else { return }
+        guard Self.isEnabled, !isConfigured else { return }
         guard let key = Bundle.main.object(forInfoDictionaryKey: "STACKS_REVENUECAT_API_KEY") as? String,
               !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Stacks Pro is not configured for this build. Continue free for now."
@@ -131,6 +135,7 @@ final class StacksPro {
     }
 
     func setAccount(_ id: UUID?) async {
+        guard Self.isEnabled else { return }
         guard accountID != id || (id != nil && !isAccountLinked) else { return }
         if accountID != id { close() }
         isPro = false
@@ -154,6 +159,7 @@ final class StacksPro {
     }
 
     func refreshEntitlement() async {
+        guard Self.isEnabled else { return }
         guard accountID != nil, isConfigured, isAccountLinked else { isPro = false; return }
         do {
             let customerInfo = try await Purchases.shared.customerInfo()

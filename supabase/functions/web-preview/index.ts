@@ -115,6 +115,9 @@ serve(async (req) => {
       stack: {
         id: stack.id,
         title: stack.title,
+        slug: stackSlug(stack.title),
+        visibility: stack.visibility,
+        updatedAt: stack.updated_at,
         wishlistMode: stack.wishlist_mode,
         author: profile ? {
           displayName: profile.display_name,
@@ -185,46 +188,64 @@ async function publicStackFeed(page: number): Promise<Response> {
 async function publicProfile(username: string): Promise<Response> {
   const admin = serviceClient();
   const { data: profile, error: profileError } = await admin.from("profiles")
-    .select("id, display_name, username, bio, avatar_path, discovery_enabled, profile_share_enabled")
+    .select("id, display_name, username, bio, avatar_path")
     .eq("username", username)
     .maybeSingle();
   if (profileError) throw profileError;
   if (!profile) return jsonResponse({ error: "Profile unavailable." }, 404);
 
+  // Every account has a public page, like a Pinterest profile. Only Stacks
+  // the owner made public appear on it; private and link-only Stacks never do.
   const { data: stacks, error: stackError } = await admin.from("stacks")
-    .select("id, title, updated_at")
+    .select("id, title, updated_at, wishlist_mode")
     .eq("owner_id", profile.id)
     .eq("visibility", "public")
     .order("updated_at", { ascending: false })
-    .limit(24);
+    .limit(60);
   if (stackError) throw stackError;
-  // Sharing one's profile is an explicit opt-in; a public Stack also exposes
-  // its byline without making unrelated private Stacks or bio public.
-  if (!profile.profile_share_enabled && !profile.discovery_enabled && (stacks ?? []).length === 0) {
-    return jsonResponse({ error: "Profile unavailable." }, 404);
-  }
   const avatarURL = profile.avatar_path
     ? (await admin.storage.from("profile-media").createSignedUrl(profile.avatar_path, 300)).data?.signedUrl ?? null
     : null;
   const publicStacks = await Promise.all((stacks ?? []).map(async (stack) => {
-    const { data: items, error } = await admin.from("stack_items")
-      .select("removed_background_image_path, original_image_path")
+    const { data: items, error, count } = await admin.from("stack_items")
+      .select("removed_background_image_path, original_image_path", { count: "exact" })
       .eq("stack_id", stack.id)
       .order("created_at")
-      .limit(4);
+      .limit(6);
     if (error) throw error;
     const images = await Promise.all((items ?? []).map(async (item) => {
       const path = item.removed_background_image_path ?? item.original_image_path;
       return path ? (await admin.storage.from(bucket).createSignedUrl(path, 300)).data?.signedUrl ?? null : null;
     }));
-    return { id: stack.id, title: stack.title, images: images.filter((image): image is string => Boolean(image)) };
+    return {
+      id: stack.id,
+      title: stack.title,
+      slug: stackSlug(stack.title),
+      updatedAt: stack.updated_at,
+      wishlistMode: stack.wishlist_mode,
+      itemCount: count ?? items?.length ?? 0,
+      images: images.filter((image): image is string => Boolean(image)),
+      coverPath: (items ?? []).map((item) => item.removed_background_image_path ?? item.original_image_path).find(Boolean) ?? null,
+    };
   }));
-  return jsonResponse({ profile: {
-    displayName: profile.display_name,
-    username: profile.username,
-    bio: profile.discovery_enabled ? profile.bio : "",
-    avatarURL,
-  }, stacks: publicStacks });
+  // Link previews (iMessage, Instagram) fetch the image later, so it needs a
+  // longer-lived URL than the page itself. It is already a public Stack image.
+  const coverPath = publicStacks.find((stack) => stack.coverPath)?.coverPath;
+  const shareImageURL = coverPath
+    ? (await admin.storage.from(bucket).createSignedUrl(coverPath, 60 * 60 * 24 * 7)).data?.signedUrl ?? null
+    : null;
+  return jsonResponse({
+    profile: {
+      displayName: profile.display_name,
+      username: profile.username,
+      bio: profile.bio ?? "",
+      avatarURL,
+      stackCount: publicStacks.length,
+      itemCount: publicStacks.reduce((total, stack) => total + stack.itemCount, 0),
+      shareImageURL,
+    },
+    stacks: publicStacks.map(({ coverPath: _coverPath, ...stack }) => stack),
+  });
 }
 
 function publicSiteURL(req: Request, path: string): string | null {
@@ -246,7 +267,7 @@ async function loadSharedStack(
 ) {
   const { data: publicStack, error: publicError } = await admin
     .from("stacks")
-    .select("id, owner_id, title, wishlist_mode, visibility")
+    .select("id, owner_id, title, wishlist_mode, visibility, updated_at")
     .eq("id", stackID)
     .eq("visibility", "public")
     .maybeSingle();
@@ -255,7 +276,7 @@ async function loadSharedStack(
   if (!isUUID(linkToken)) return null;
   const { data: linkOnlyStack, error: linkError } = await admin
     .from("stacks")
-    .select("id, owner_id, title, wishlist_mode, visibility")
+    .select("id, owner_id, title, wishlist_mode, visibility, updated_at")
     .eq("id", stackID)
     .eq("visibility", "link_only")
     .eq("public_link_token", linkToken)
@@ -386,7 +407,8 @@ function publicInformationPage(page: string): Response {
       <h2>Price alerts and notifications</h2><p>If you create a price alert, our servers periodically request the product page you chose and store price observations, check times and error status. Prices may be delayed, unavailable or inaccurate, and an alert is not a price guarantee. Push notifications require your device token and Apple processes delivery under its own privacy terms. You can disable price notifications in Stacks or in iOS Settings and can delete an alert at any time.</p>
       <h2>Website waitlist</h2><p>If you join the waitlist, we store your requested username, email address and signup time to reserve the name and contact you about launch. A website reservation is not proof that you own the email address; we may require email verification before attaching the username to an app account. We do not use waitlist email addresses for unrelated marketing without separate consent. To change or remove a reservation, contact <a href="mailto:${email}">${email}</a>.</p>
       <h2>Sharing and visibility</h2><p>Public Stacks can be viewed by others. When you choose Share profile, your name, username and profile photo become available at stacks.spot/your-username; this does not list your private or link-only Stacks or opt you into Discover. You can turn off direct profile sharing from the same menu, although a Discover profile or public Stack may still make that page accessible. Anyone holding an active link-only Stack URL may be able to view that Stack. Private Stacks are limited to authorized members. Collaborators can access content in their shared Stack. Choose visibility carefully and do not place sensitive information in public or link-only content.</p>
-      <h2>Service providers</h2><p>We use service providers, including Supabase, for authentication, database, storage and server functions. We disclose only information reasonably needed for those providers to perform services for us. Providers may process information in countries other than your own; where required, we rely on recognized transfer safeguards.</p>
+      <h2>Usage analytics</h2><p>To understand how Stacks is used and improve it, the app records product-interaction events (for example, opening the app, creating a Stack, saving or importing an item, sharing, or tapping Buy) with your Stacks account ID, device type and app version, and sends them to our analytics provider, PostHog. We do not send your name, email address or advertising identifiers, we do not use analytics to track you across other companies' apps or websites, and we do not sell this information. Our website records anonymous page views without storing cookies on your device. You can turn off usage analytics at any time in the app under Settings, Privacy choices.</p>
+      <h2>Service providers</h2><p>We use service providers, including Supabase and PostHog, for authentication, database, storage and server functions. We disclose only information reasonably needed for those providers to perform services for us. Providers may process information in countries other than your own; where required, we rely on recognized transfer safeguards.</p>
       <h2>Affiliate links and external retailers</h2><p>For a potential affiliate link, our server may send the destination product URL and a two-letter country code to an affiliate-link provider to determine whether the retailer is eligible and to return a qualifying referral URL. We do not send your Stacks account ID, name, email address or an app advertising identifier with that request. A qualifying link is labeled before you click it. Once you open an external retailer or affiliate destination, that third party processes information under its own privacy notice and may use cookies or similar technologies. See our <a href="?page=affiliate">Affiliate Disclosure</a>.</p>
       <h2>Tracking and cookies</h2><p>Stacks does not currently include a third-party advertising SDK or use app data to track you across other companies’ apps or websites. The browser viewer does not currently set nonessential advertising cookies. If we introduce tracking or nonessential cookies, we will update this policy and request consent where required before enabling them.</p>
       <h2>Retention and deletion</h2><p>We retain account and content data while your account is active and as needed to provide Stacks. When you delete your account, we delete or de-identify account content subject to limited retention needed for security, fraud prevention, dispute resolution, backups and legal obligations. The exact period depends on the record and reason it is retained. You can request account deletion inside the app.</p>
