@@ -80,6 +80,7 @@ if (form) {
       });
       const result = await response.json();
       if (result.status === "joined") {
+        if (typeof window.stacksTrack === "function") window.stacksTrack("waitlist_joined");
         form.hidden = true;
         document.getElementById("waitlist-success-copy").textContent = `@${checkedUsername} is reserved for the email you entered. We'll contact you about launch.`;
         success.hidden = false;

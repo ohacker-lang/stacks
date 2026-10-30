@@ -23,6 +23,8 @@ protocol StackRepository: Sendable {
     func fetchMyStacks(for userID: UUID) async throws -> [Stack]
     func fetchOwnedStackDestinations(for user: UserProfile) async throws -> [SharedStackDestination]
     func fetchStack(id: UUID, for userID: UUID) async throws -> Stack
+    /// The Stacks shown on someone's public profile at stacks.spot/username.
+    func fetchPublicStacks(ownerID: UUID, for viewerID: UUID) async throws -> [Stack]
     func fetchDiscoverStacks(query: String?) async throws -> [Stack]
     func createStack(title: String, wishlistMode: Bool, visibility: StackVisibility, owner: UserProfile) async throws -> Stack
     func fetchSharedStack(token: UUID) async throws -> Stack
@@ -41,6 +43,8 @@ protocol ProfileRepository: Sendable {
     func currentProfile(for session: AuthSession) async throws -> UserProfile
     func updateProfile(_ profile: UserProfile, avatarData: Data?) async throws -> UserProfile
     func enableProfileSharing() async throws
+    /// Resolves a stacks.spot/username link. Returns nil for unknown or blocked accounts.
+    func publicProfile(username: String) async throws -> UserProfile?
     func disableProfileSharing() async throws
     func suggestedCreators() async throws -> [UserProfile]
     func searchCreators(query: String) async throws -> [UserProfile]

@@ -107,6 +107,12 @@ actor MockStackRepository: StackRepository {
             }
     }
 
+    func fetchPublicStacks(ownerID: UUID, for viewerID: UUID) async throws -> [Stack] {
+        (myStacks + discoverStacks)
+            .filter { $0.ownerID == ownerID && $0.visibility == .publicDiscover }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
     func fetchStack(id: UUID, for userID: UUID) async throws -> Stack {
         guard let stack = (myStacks + discoverStacks).first(where: { $0.id == id }),
               stack.ownerID == userID || stack.visibility == .publicDiscover || stack.visibility == .publicLink
@@ -324,6 +330,11 @@ actor MockProfileRepository: ProfileRepository {
     }
 
     func enableProfileSharing() async throws {}
+
+    func publicProfile(username: String) async throws -> UserProfile? {
+        ([currentProfile] + (try await suggestedCreators()))
+            .first { $0.username.caseInsensitiveCompare(username) == .orderedSame }
+    }
 
     func disableProfileSharing() async throws {}
 

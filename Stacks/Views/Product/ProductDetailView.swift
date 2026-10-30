@@ -113,6 +113,12 @@ struct ProductDetailView: View {
                         Link(destination: affiliateResolution?.url ?? currentItem.buyURL) {
                             ProductBuyButton(title: buyButtonTitle, price: currentItem.price > 0 ? currentItem.formattedPrice : "")
                         }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.capture("buy_tapped", [
+                                "retailer_host": Analytics.host(of: currentItem.buyURL),
+                                "commissionable": affiliateResolution?.isCommissionable == true,
+                            ])
+                        })
                     } else {
                         ProductBuyButton(title: buyButtonTitle, price: "Add a link", isEnabled: false)
                             .accessibilityLabel("No purchase link available")
@@ -455,6 +461,7 @@ private struct ProductNavigationBar: View {
                 ShareLink(item: shareURL) {
                     Label("Share Product", systemImage: "square.and.arrow.up")
                 }
+                .simultaneousGesture(TapGesture().onEnded { Analytics.capture("product_shared") })
 
                 Button(action: onAddToAnotherStack) {
                     Label("Add to Another Stack", systemImage: "square.stack.3d.up")

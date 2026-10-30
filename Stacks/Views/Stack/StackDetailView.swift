@@ -730,9 +730,11 @@ private struct StackSharePreviewSheet: View {
         }
         .sheet(item: $activityItems) { selection in
             StackShareActivitySheet(items: selection.items)
+                .onAppear { Analytics.capture("stack_shared", ["visibility": stack.visibility.analyticsValue, "channel": "share_sheet"]) }
         }
         .sheet(item: $messagePayload) { payload in
             StackShareMessageSheet(payload: payload)
+                .onAppear { Analytics.capture("stack_shared", ["visibility": stack.visibility.analyticsValue, "channel": "messages"]) }
         }
         .confirmationDialog(
             "Create a private share link?",
@@ -1256,6 +1258,7 @@ private struct StackSettingsOverlay: View {
                             .stackSettingsGlass(cornerRadius: 20)
                         }
                         .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded { Analytics.capture("stack_shared", ["visibility": stack.visibility.analyticsValue, "channel": "wishlist_link"]) })
                         if stack.visibility == .publicLink {
                             StackSettingsActionCard(
                                 title: "Reset wishlist link",
@@ -1411,7 +1414,7 @@ private struct StackSettingsOverlay: View {
         case .private: "Only you can see it."
         case .inviteOnly: "Only invited people can open it."
         case .publicLink: "Anyone with the link can view it."
-        case .publicDiscover: "Anyone can find it in Discover."
+        case .publicDiscover: "Anyone can see it on your profile."
         }
     }
 
@@ -1645,7 +1648,7 @@ private struct StackVisibilityEditorSheet: View {
         case .private: "Only you can view this Stack."
         case .inviteOnly: "Only people you invite can open it."
         case .publicLink: "Anyone with the link can view it."
-        case .publicDiscover: "Anyone can find it in Discover."
+        case .publicDiscover: "Anyone can see it on your stacks.spot profile."
         }
     }
 }

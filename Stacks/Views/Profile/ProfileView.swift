@@ -76,8 +76,6 @@ struct ProfileView: View {
     @State private var safetyMessage: String?
     @State private var profileShareURL: URL?
     @State private var isShowingProfileShare = false
-    @State private var isConfirmingProfileShare = false
-    @State private var isConfirmingProfileShareDisable = false
 
     let profile: UserProfile
     let onOpenStack: (Stack) -> Void
@@ -118,8 +116,13 @@ struct ProfileView: View {
             },
             onEdit: { isEditingProfile = true },
             onOpenSettings: { isShowingSettings = true },
-            onShareProfile: { isConfirmingProfileShare = true },
-            onDisableProfileSharing: { isConfirmingProfileShareDisable = true },
+            onShareProfile: {
+                // Every account has a public page at stacks.spot/username.
+                guard let url = URL(string: "https://stacks.spot/\(presentedProfile.username.lowercased())") else { return }
+                profileShareURL = url
+                isShowingProfileShare = true
+                Analytics.capture("profile_shared", ["own": true])
+            },
             onOpenStack: onOpenStack,
             onToggleFollow: toggleFollow,
             onReport: { reason in
@@ -222,39 +225,6 @@ struct ProfileView: View {
                 ProfileURLShareSheet(url: profileShareURL)
                     .presentationDetents([.medium, .large])
             }
-        }
-        .alert("Share your profile?", isPresented: $isConfirmingProfileShare) {
-            Button("Share Profile") {
-                Task {
-                    do {
-                        try await services.profiles.enableProfileSharing()
-                        editableProfile.profileShareEnabled = true
-                        guard let url = URL(string: "https://stacks.spot/\(presentedProfile.username)") else { return }
-                        profileShareURL = url
-                        isShowingProfileShare = true
-                    } catch {
-                        safetyMessage = "Could not make your profile shareable. \(error.localizedDescription)"
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your name, username, photo, and public Stacks will be visible at stacks.spot/\(presentedProfile.username). Private and link-only Stacks stay hidden.")
-        }
-        .alert("Stop sharing your profile?", isPresented: $isConfirmingProfileShareDisable) {
-            Button("Stop Sharing", role: .destructive) {
-                Task {
-                    do {
-                        try await services.profiles.disableProfileSharing()
-                        editableProfile.profileShareEnabled = false
-                    } catch {
-                        safetyMessage = "Could not turn off profile sharing. \(error.localizedDescription)"
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your profile link will stop working unless you also have public Stacks or your Discover profile is enabled. Existing private and link-only Stack links are unaffected.")
         }
         .alert("Delete account?", isPresented: $showsDeleteConfirmation) {
             Button("Delete Account", role: .destructive) {
@@ -482,7 +452,6 @@ private struct ProfileRedesignScreen: View {
     let onEdit: () -> Void
     let onOpenSettings: () -> Void
     let onShareProfile: () -> Void
-    let onDisableProfileSharing: () -> Void
     let onOpenStack: (Stack) -> Void
     let onToggleFollow: () -> Void
     let onReport: (String) -> Void
@@ -493,8 +462,10 @@ private struct ProfileRedesignScreen: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
+                // Short enough that the name and Edit profile / Follow sit above
+                // the floating tab bar on a 6.1" iPhone without scrolling.
                 ProfileHeroCollage(items: heroItems)
-                    .frame(height: 505)
+                    .frame(height: 430)
                     .overlay(alignment: .topLeading) {
                         Button(action: onBack) {
                             Image(systemName: "chevron.left")
@@ -514,9 +485,6 @@ private struct ProfileRedesignScreen: View {
                             Menu {
                                 Button("Settings", action: onOpenSettings)
                                 Button("Share profile", systemImage: "square.and.arrow.up", action: onShareProfile)
-                                if profile.profileShareEnabled == true {
-                                    Button("Stop sharing profile", systemImage: "link.badge.minus", role: .destructive, action: onDisableProfileSharing)
-                                }
                             } label: {
                                 ProfileMoreButton()
                             }
@@ -527,6 +495,7 @@ private struct ProfileRedesignScreen: View {
                                     ShareLink(item: profileURL) {
                                         Label("Share profile", systemImage: "square.and.arrow.up")
                                     }
+                                    .simultaneousGesture(TapGesture().onEnded { Analytics.capture("profile_shared", ["own": false]) })
                                 }
                                 if !CuratedStackCatalog.isCuratedProfile(profile.id) {
                                     Button("Report profile", systemImage: "flag") {
@@ -630,7 +599,8 @@ private struct ProfileRedesignScreen: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
-                .padding(.bottom, 56)
+                // Clears the floating Stacks / Add tab bar.
+                .padding(.bottom, 120)
             }
         }
         .confirmationDialog("Why are you reporting this profile?", isPresented: $isShowingReportReasons) {
@@ -1061,7 +1031,7 @@ private struct ProfileSettingsSheet: View {
                     NavigationLink {
                         NotificationSettingsView()
                     } label: {
-                        settingsLabel("Notifications", symbol: "bell")
+                        settingsLabel("Notifications", symbol: "bell", showsChevron: false)
                     }
                 }
 
@@ -1075,7 +1045,7 @@ private struct ProfileSettingsSheet: View {
                         .navigationTitle("Blocked accounts")
                         .navigationBarTitleDisplayMode(.inline)
                     } label: {
-                        settingsLabel("Blocked accounts", symbol: "hand.raised.slash")
+                        settingsLabel("Blocked accounts", symbol: "hand.raised.slash", showsChevron: false)
                     }
                     settingsRow("Privacy choices", symbol: "lock") { onOpenInfo(.privacyChoices) }
                 }
@@ -1115,15 +1085,19 @@ private struct ProfileSettingsSheet: View {
         }
     }
 
-    private func settingsLabel(_ title: String, symbol: String, isDestructive: Bool = false) -> some View {
+    /// NavigationLink rows already get a system chevron, so they pass
+    /// `showsChevron: false` to avoid drawing two.
+    private func settingsLabel(_ title: String, symbol: String, isDestructive: Bool = false, showsChevron: Bool = true) -> some View {
         HStack(spacing: 13) {
             Image(systemName: symbol)
                 .frame(width: 22)
             Text(title)
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.stacksMutedInk)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.stacksMutedInk)
+            }
         }
         .font(.system(size: 16, weight: .regular, design: .default))
         .foregroundStyle(isDestructive ? Color.red : Color.stacksInk)
@@ -1135,6 +1109,7 @@ private struct AccountInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
     let destination: AccountInfoDestination
     let onRequestDeletion: () -> Void
+    @State private var sharesUsageAnalytics = Analytics.isSharingEnabled
 
     private var publicPageURL: URL? {
         let page: String
@@ -1172,6 +1147,20 @@ private struct AccountInfoSheet: View {
                 }
 
                 if destination == .privacyChoices {
+                    Toggle(isOn: $sharesUsageAnalytics) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Share usage analytics")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("Anonymous app usage tied to your account ID, never sold or used for ads.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.stacksMutedInk)
+                        }
+                    }
+                    .tint(Color.stacksInk)
+                    .onChange(of: sharesUsageAnalytics) { _, isOn in
+                        Analytics.isSharingEnabled = isOn
+                    }
+
                     Button {
                         dismiss()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
