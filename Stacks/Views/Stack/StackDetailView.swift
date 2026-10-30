@@ -1194,10 +1194,10 @@ private struct StackSettingsOverlay: View {
 
     var body: some View {
         ZStack {
-            // Keep the Stack exactly as it was behind settings. The empty
-            // hit target only dismisses the popover; it does not tint or blur
-            // the editorial canvas.
-            Color.clear
+            // A soft paper wash keeps the Stack faintly visible behind settings
+            // without its products showing through the glass cards and help
+            // text. Tapping it dismisses the popover.
+            Color.white.opacity(0.86)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onDismiss)
