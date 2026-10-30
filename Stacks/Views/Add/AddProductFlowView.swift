@@ -386,6 +386,8 @@ struct BarcodeProductScannerView: View {
     @State private var scanner = BarcodeCameraController()
     @State private var isLookingUp = false
     @State private var errorMessage: String?
+    @State private var errorTitle = "Couldn’t find this product"
+    @State private var isCameraDenied = false
     @State private var manualCode = ""
     @State private var isShowingMoreWaysHint = false
 
@@ -512,13 +514,31 @@ struct BarcodeProductScannerView: View {
             }
             scanner.start(
                 onCode: { code in resolve(code) },
-                onUnavailable: { errorMessage = "Barcode scanning is unavailable on this device. You can paste a product link instead." }
+                onUnavailable: {
+                    // A denied camera and a device without one need different
+                    // advice than a barcode the product databases don't know.
+                    switch AVCaptureDevice.authorizationStatus(for: .video) {
+                    case .denied, .restricted:
+                        isCameraDenied = true
+                        errorTitle = "Camera access is off"
+                        errorMessage = "Allow camera access in Settings to scan barcodes, or paste a product link instead."
+                    default:
+                        isCameraDenied = false
+                        errorTitle = "Scanning isn’t available"
+                        errorMessage = "This device can’t scan barcodes. You can paste a product link instead."
+                    }
+                }
             )
         }
         .onDisappear { scanner.stop() }
-        .alert("Couldn’t find this product", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert(errorTitle, isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            if isCameraDenied, let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                Button("Open Settings") { UIApplication.shared.open(settingsURL) }
+            }
             Button("Paste Link", action: onPasteLink)
-            Button("Scan Again") { scanner.resumeScanning() }
+            if !isCameraDenied {
+                Button("Scan Again") { scanner.resumeScanning() }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
@@ -550,6 +570,8 @@ struct BarcodeProductScannerView: View {
                 ])
                 await MainActor.run {
                     isLookingUp = false
+                    isCameraDenied = false
+                    errorTitle = "Couldn’t find this product"
                     errorMessage = error.localizedDescription
                 }
             }

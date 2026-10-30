@@ -41,7 +41,7 @@ private struct StoredSupabaseSession: Codable, Sendable {
 /// database. The actor serializes refresh and clear operations across services.
 private actor SupabaseSessionStore {
     static let shared = SupabaseSessionStore()
-    private let service = "com.owenhackero.stacks.supabase"
+    private let service = "spot.stacks.app.supabase"
     private let account = "current-session"
 
     func load() -> StoredSupabaseSession? {

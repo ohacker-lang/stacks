@@ -13,7 +13,7 @@ test("association file opens Stacks, invites, profiles and boards but not site p
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/json");
   const body = await response.json();
-  assert.equal(body.applinks.details[0].appID, "ZVV8KBVP26.com.owenhackero.stacks");
+  assert.equal(body.applinks.details[0].appID, "24H7V96T4Q.spot.stacks.app");
   const paths = body.applinks.details[0].paths;
   assert.deepEqual(paths.slice(0, 2), ["/s/*", "/invite/*"]);
   assert.deepEqual(paths.slice(-2), ["/*", "/*/*"]);
@@ -33,7 +33,7 @@ test("a shared Stack is fetched from Supabase and uses branded legal links", asy
   let upstream;
   globalThis.fetch = async (requestURL, options) => {
     upstream = { url: requestURL.toString(), accept: options.headers.Accept, proxy: options.headers["X-Stacks-Web-Proxy"], redirect: options.redirect };
-    return new Response('<html><head></head><body><a href="https://iuovmgjcfwgwozfnsdgf.supabase.co/functions/v1/web-preview?page=privacy">Privacy</a></body></html>');
+    return new Response('<html><head></head><body><a href="https://whyufyttlvpiwlunosjm.supabase.co/functions/v1/web-preview?page=privacy">Privacy</a></body></html>');
   };
   try {
     const response = await worker.fetch(new Request(`https://stacks.spot/s/${stackID}?token=${token}`), assets);

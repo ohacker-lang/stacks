@@ -462,8 +462,10 @@ private struct ProfileRedesignScreen: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
+                // Short enough that the name and Edit profile / Follow sit above
+                // the floating tab bar on a 6.1" iPhone without scrolling.
                 ProfileHeroCollage(items: heroItems)
-                    .frame(height: 505)
+                    .frame(height: 430)
                     .overlay(alignment: .topLeading) {
                         Button(action: onBack) {
                             Image(systemName: "chevron.left")
@@ -597,7 +599,8 @@ private struct ProfileRedesignScreen: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 6)
-                .padding(.bottom, 56)
+                // Clears the floating Stacks / Add tab bar.
+                .padding(.bottom, 120)
             }
         }
         .confirmationDialog("Why are you reporting this profile?", isPresented: $isShowingReportReasons) {
@@ -1028,7 +1031,7 @@ private struct ProfileSettingsSheet: View {
                     NavigationLink {
                         NotificationSettingsView()
                     } label: {
-                        settingsLabel("Notifications", symbol: "bell")
+                        settingsLabel("Notifications", symbol: "bell", showsChevron: false)
                     }
                 }
 
@@ -1042,7 +1045,7 @@ private struct ProfileSettingsSheet: View {
                         .navigationTitle("Blocked accounts")
                         .navigationBarTitleDisplayMode(.inline)
                     } label: {
-                        settingsLabel("Blocked accounts", symbol: "hand.raised.slash")
+                        settingsLabel("Blocked accounts", symbol: "hand.raised.slash", showsChevron: false)
                     }
                     settingsRow("Privacy choices", symbol: "lock") { onOpenInfo(.privacyChoices) }
                 }
@@ -1082,15 +1085,19 @@ private struct ProfileSettingsSheet: View {
         }
     }
 
-    private func settingsLabel(_ title: String, symbol: String, isDestructive: Bool = false) -> some View {
+    /// NavigationLink rows already get a system chevron, so they pass
+    /// `showsChevron: false` to avoid drawing two.
+    private func settingsLabel(_ title: String, symbol: String, isDestructive: Bool = false, showsChevron: Bool = true) -> some View {
         HStack(spacing: 13) {
             Image(systemName: symbol)
                 .frame(width: 22)
             Text(title)
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.stacksMutedInk)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.stacksMutedInk)
+            }
         }
         .font(.system(size: 16, weight: .regular, design: .default))
         .foregroundStyle(isDestructive ? Color.red : Color.stacksInk)
