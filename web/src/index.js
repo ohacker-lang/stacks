@@ -1,7 +1,7 @@
 import { curatedProfile, curatedStacks } from "./curated.js";
 
 const publicOrigin = "https://stacks.spot";
-const supabasePreview = "https://iuovmgjcfwgwozfnsdgf.supabase.co/functions/v1/web-preview";
+const supabasePreview = "https://whyufyttlvpiwlunosjm.supabase.co/functions/v1/web-preview";
 const policyPages = new Set([
   "terms", "privacy", "security", "support", "affiliate", "privacy-choices",
 ]);
@@ -124,25 +124,25 @@ function curatedStackPage(stack) {
   }).join("");
   const update = new Date(stack.updatedAt);
   const date = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }).format(update);
-  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(stack.title)} · Stacks</title><meta name="description" content="Explore ${escapeHTML(stack.title)} by Aliva Yakatori."><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"></head><body class="demo-page curated-stack-page"><header class="site-header"><nav class="nav-pill" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><a href="/waitlist">Waitlist</a><a href="/stacks">Explore</a></nav></header><main class="demo-main"><header class="demo-stack-header"><div class="demo-stack-actions"><a class="demo-back-action" href="/aliva" aria-label="Back to Aliva's profile">‹</a><span class="demo-share-action" aria-hidden="true">↥</span></div><h1>${escapeHTML(stack.title)}</h1><div class="demo-byline"><span class="preview-avatar"><img src="${escapeHTML(curatedProfile.avatarURL)}" alt=""></span><a href="/aliva">${escapeHTML(curatedProfile.displayName)}</a><span class="demo-date"><span>Last update</span><time datetime="${escapeHTML(stack.updatedAt.slice(0, 10))}">${escapeHTML(date)}</time></span></div></header><section class="demo-canvas" style="height:${canvasHeight}px" aria-label="Products in ${escapeHTML(stack.title)}">${items}</section><aside class="demo-bottom-cta"><h2>Make a Stack of your own.</h2><p>Save the things you love in one place.</p><a class="button" href="/waitlist">Claim your username ↗</a></aside></main></body></html>`);
+  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(stack.title)} · Stacks</title><meta name="description" content="Explore ${escapeHTML(stack.title)} by Aliva Yakatori."><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head><body class="demo-page curated-stack-page"><header class="site-header"><nav class="nav-pill" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><a href="/waitlist">Waitlist</a><a href="/stacks">Explore</a></nav></header><main class="demo-main"><header class="demo-stack-header"><div class="demo-stack-actions"><a class="demo-back-action" href="/aliva" aria-label="Back to Aliva's profile">‹</a><span class="demo-share-action" aria-hidden="true">↥</span></div><h1>${escapeHTML(stack.title)}</h1><div class="demo-byline"><span class="preview-avatar"><img src="${escapeHTML(curatedProfile.avatarURL)}" alt=""></span><a href="/aliva">${escapeHTML(curatedProfile.displayName)}</a><span class="demo-date"><span>Last update</span><time datetime="${escapeHTML(stack.updatedAt.slice(0, 10))}">${escapeHTML(date)}</time></span></div></header><section class="demo-canvas" style="height:${canvasHeight}px" aria-label="Products in ${escapeHTML(stack.title)}">${items}</section><aside class="demo-bottom-cta"><h2>Make a Stack of your own.</h2><p>Save the things you love in one place.</p><a class="button" href="/waitlist">Claim your username ↗</a></aside></main></body></html>`);
 }
 
 function curatedProductPage(stack, item) {
   const destination = new URL(item.sourceURL);
   if (destination.protocol !== "https:") return informationPage("Product unavailable", "That product link isn't available.", 404);
-  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(item.title)} · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"></head><body class="product-page"><main class="product-main"><nav class="product-navigation" aria-label="Product navigation"><a class="product-nav-circle" href="/s/${stack.id}" aria-label="Back to ${escapeHTML(stack.title)}">‹</a></nav><div class="product-stage">${item.imageURL ? `<img src="${escapeHTML(item.imageURL)}" alt="${escapeHTML(item.title)}">` : `<span class="curated-item-fallback">${escapeHTML(item.brand)}<small>${escapeHTML(item.title)}</small></span>`}</div><h1>${escapeHTML(item.title)}</h1><section class="product-info" aria-label="Product information"><div class="product-info-row"><span>Brand</span><strong>${escapeHTML(item.brand)}</strong></div><div class="product-info-row"><span>Stack</span><strong>${escapeHTML(stack.title)}</strong></div></section></main><aside class="product-actions"><a class="product-buy" href="${escapeHTML(destination.href)}" target="_blank" rel="noopener noreferrer"><span>View at ${escapeHTML(item.retailer)}</span><span aria-hidden="true">↗</span></a><a class="product-download" href="/waitlist">Claim your username</a></aside></body></html>`);
+  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(item.title)} · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head><body class="product-page"><main class="product-main"><nav class="product-navigation" aria-label="Product navigation"><a class="product-nav-circle" href="/s/${stack.id}" aria-label="Back to ${escapeHTML(stack.title)}">‹</a></nav><div class="product-stage">${item.imageURL ? `<img src="${escapeHTML(item.imageURL)}" alt="${escapeHTML(item.title)}">` : `<span class="curated-item-fallback">${escapeHTML(item.brand)}<small>${escapeHTML(item.title)}</small></span>`}</div><h1>${escapeHTML(item.title)}</h1><section class="product-info" aria-label="Product information"><div class="product-info-row"><span>Brand</span><strong>${escapeHTML(item.brand)}</strong></div><div class="product-info-row"><span>Stack</span><strong>${escapeHTML(stack.title)}</strong></div></section></main><aside class="product-actions"><a class="product-buy" href="${escapeHTML(destination.href)}" target="_blank" rel="noopener noreferrer"><span>View at ${escapeHTML(item.retailer)}</span><span aria-hidden="true">↗</span></a><a class="product-download" href="/waitlist">Claim your username</a></aside></body></html>`);
 }
 
 function informationPage(title, message, status = 200) {
-  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(title)} · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"></head><body class="message-page"><main class="message-card"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><h1>${escapeHTML(title)}</h1><p>${escapeHTML(message)}</p><a class="button" href="/">Back to Stacks</a></main></body></html>`, status, { "X-Robots-Tag": "noindex" });
+  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(title)} · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head><body class="message-page"><main class="message-card"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><h1>${escapeHTML(title)}</h1><p>${escapeHTML(message)}</p><a class="button" href="/">Back to Stacks</a></main></body></html>`, status, { "X-Robots-Tag": "noindex" });
 }
 
 function localizeHTML(html) {
   return html
     .replaceAll("trystacks@gmail.com", "support@stacks.spot")
     .replace(/href="\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
-    .replace(/href="https:\/\/iuovmgjcfwgwozfnsdgf\.supabase\.co\/functions\/v1\/web-preview\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
-    .replace("</head>", '<link rel="stylesheet" href="/site.css"></head>')
+    .replace(/href="https:\/\/whyufyttlvpiwlunosjm\.supabase\.co\/functions\/v1\/web-preview\?page=(terms|privacy|security|support|affiliate|privacy-choices)"/g, 'href="/$1"')
+    .replace("</head>", '<link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head>')
     .replace("<nav><strong>Stacks</strong>", '<nav><a class="legal-wordmark" href="/">Stacks</a>')
     .replace("<span>For iPhone · coming soon</span>", '<a class="get-app" href="/waitlist">Claim your username</a>')
     .replace(/<section class="pitch">[\s\S]*?<\/section>/, section => section.includes('class="get-app"')
@@ -181,7 +181,7 @@ async function upstreamPage(url, upstreamFetch, { linkOnly = false } = {}) {
 
 function invitePage(token) {
   const deepLink = `stacks://invite?token=${encodeURIComponent(token)}`;
-  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You're invited to a Collab · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"></head><body class="message-page"><main class="message-card"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><h1>You're invited to a Collab.</h1><p>Open this invitation in Stacks to see the shared Stack and join in.</p><a class="button" href="${deepLink}">Open Stacks</a><a class="button secondary" href="/waitlist">Claim your username</a></main></body></html>`, 200, {
+  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>You're invited to a Collab · Stacks</title><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head><body class="message-page"><main class="message-card"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><h1>You're invited to a Collab.</h1><p>Open this invitation in Stacks to see the shared Stack and join in.</p><a class="button" href="${deepLink}">Open Stacks</a><a class="button secondary" href="/waitlist">Claim your username</a></main></body></html>`, 200, {
     "Referrer-Policy": "no-referrer",
     "X-Robots-Tag": "noindex, nofollow, noarchive",
   });
@@ -193,12 +193,47 @@ const appLinkExclusions = [
   ...[...policyPages].map(page => `/${page}`),
 ];
 
+// PostHog for stacks.spot. Served from the Worker so the project key lives in
+// wrangler.toml; without POSTHOG_KEY the script is a no-op. Visitors are
+// anonymous and nothing is stored on their device (memory persistence), so no
+// cookie banner is needed. Event names are documented in docs/ANALYTICS.md.
+function analyticsScript(env) {
+  const key = typeof env?.POSTHOG_KEY === "string" ? env.POSTHOG_KEY.trim() : "";
+  const host = typeof env?.POSTHOG_HOST === "string" && env.POSTHOG_HOST.startsWith("https://") ? env.POSTHOG_HOST : "https://us.i.posthog.com";
+  const body = !key.startsWith("phc_") ? "window.stacksTrack=function(){};" : `!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register reset opt_out_capturing opt_in_capturing set_config".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+posthog.init(${JSON.stringify(key)},{api_host:${JSON.stringify(host)},persistence:"memory",person_profiles:"identified_only",capture_pageview:false,capture_pageleave:false,autocapture:false,disable_session_recording:true});
+(function(){var path=location.pathname.replace(/\\/+$/,"")||"/",parts=path.split("/").filter(Boolean),reserved=["waitlist","download","stacks","demo","terms","privacy","security","support","affiliate","privacy-choices"],props={};
+if(path==="/")props.page_type="home";
+else if(parts[0]==="waitlist"||parts[0]==="download")props.page_type="waitlist";
+else if(parts[0]==="stacks")props.page_type="explore";
+else if(parts[0]==="demo")props.page_type="demo";
+else if(reserved.indexOf(parts[0])>-1)props.page_type="legal";
+else if(parts[0]==="s"&&parts[2]==="p")props.page_type="pin";
+else if(parts[0]==="s")props.page_type=document.body&&document.body.classList.contains("sp-page")?"board":"wishlist";
+else if(parts[0]==="invite")props.page_type="invite";
+else if(parts.length===1){props.page_type="profile";props.profile_username=parts[0].toLowerCase()}
+else if(parts.length===2){props.page_type="board";props.profile_username=parts[0].toLowerCase();props.stack_slug=parts[1].toLowerCase()}
+else props.page_type="other";
+posthog.capture("$pageview",props);
+window.stacksTrack=function(event,extra){posthog.capture(event,Object.assign({page_type:props.page_type},extra||{}))};
+document.addEventListener("click",function(e){var el=e.target.closest&&e.target.closest(".product-buy,[data-share]");if(!el)return;
+if(el.classList.contains("product-buy")){var host="";try{host=new URL(el.href).hostname.replace(/^www\\./,"")}catch(_){}window.stacksTrack("buy_clicked",{retailer_host:host})}
+else window.stacksTrack("share_clicked")},true)})();`;
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=300",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 function associationFile() {
   return new Response(JSON.stringify({
     applinks: {
       apps: [],
       details: [{
-        appID: "ZVV8KBVP26.com.owenhackero.stacks",
+        appID: "24H7V96T4Q.spot.stacks.app",
         // Site pages share the /username namespace, so exclude them before the
         // profile wildcards. Mirrors PublicProfileUniversalLink in the app.
         paths: [
@@ -313,7 +348,7 @@ async function waitlistEndpoint(request, url, env, upstreamFetch) {
 }
 
 function explorePage(cards, pagination = "") {
-  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discover public Stacks · Stacks</title><meta name="description" content="Discover public and curated Stacks."><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"></head><body class="discover-page"><header class="discover-site-header"><nav class="discover-nav" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><div class="discover-nav-links"><a href="/stacks" aria-current="page">Discover</a><a class="discover-waitlist" href="/waitlist">Claim your username</a></div></nav></header><main class="discover-main"><header class="discover-heading"><p class="eyebrow">From the Stacks community</p><h1>Discover.</h1><p>Wishlists, ideas, and finds worth keeping—stacked by people with a good eye.</p></header><section class="discover-feed" aria-label="Public Stacks">${cards || '<p class="public-empty">No public Stacks to show yet.</p>'}</section>${pagination}<footer class="demo-footer"><a href="/waitlist">Waitlist</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/support">Support</a></footer></main></body></html>`);
+  return htmlResponse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Discover public Stacks · Stacks</title><meta name="description" content="Discover public and curated Stacks."><link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script></head><body class="discover-page"><header class="discover-site-header"><nav class="discover-nav" aria-label="Main navigation"><a class="wordmark" href="/"><img class="wordmark-logo" src="/assets/stacks-logo.png" alt="">Stacks</a><div class="discover-nav-links"><a href="/stacks" aria-current="page">Discover</a><a class="discover-waitlist" href="/waitlist">Claim your username</a></div></nav></header><main class="discover-main"><header class="discover-heading"><p class="eyebrow">From the Stacks community</p><h1>Discover.</h1><p>Wishlists, ideas, and finds worth keeping—stacked by people with a good eye.</p></header><section class="discover-feed" aria-label="Public Stacks">${cards || '<p class="public-empty">No public Stacks to show yet.</p>'}</section>${pagination}<footer class="demo-footer"><a href="/waitlist">Waitlist</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/support">Support</a></footer></main></body></html>`);
 }
 
 async function publicStacksPage(url, upstreamFetch) {
@@ -402,7 +437,7 @@ function pageHead({ title, description, canonical, image, robots }) {
     canonical ? `<link rel="canonical" href="${escapeHTML(canonical)}"><meta property="og:url" content="${escapeHTML(canonical)}">` : "",
     image ? `<meta property="og:image" content="${escapeHTML(image)}"><meta name="twitter:card" content="summary_large_image">` : `<meta name="twitter:card" content="summary">`,
     robots ? `<meta name="robots" content="${escapeHTML(robots)}">` : "",
-    `<link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css">`,
+    `<link rel="icon" type="image/png" href="/assets/stacks-logo.png"><link rel="stylesheet" href="/site.css"><script src="/analytics.js" defer></script>`,
   ];
   return `<head>${tags.join("")}</head>`;
 }
@@ -568,6 +603,7 @@ export default {
     if (url.hostname.toLowerCase() === "www.stacks.spot") {
       return Response.redirect(`${publicOrigin}${url.pathname}${url.search}`, 308);
     }
+    if (url.pathname === "/analytics.js") return analyticsScript(env);
     if (url.pathname === "/api/waitlist" || url.pathname === "/api/waitlist/availability") {
       return waitlistEndpoint(request, url, env, fetch);
     }

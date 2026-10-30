@@ -2,35 +2,34 @@
 
 ## Status
 
-**Deployed to the Stacks Supabase project on September 6, 2026.** The two
-migrations are applied, the private `stack-media` bucket is in place, and all
-10 Edge Functions are active. The iOS project contains the project URL and
-publishable anon key; Row Level Security protects that key. Server secrets and
-third-party provider credentials remain in Supabase only.
+**Current as of October 29, 2026.** The backend runs on Supabase project
+`whyufyttlvpiwlunosjm`, created in October 2026 to replace the earlier
+`iuovmgjcfwgwozfnsdgf` and `hpjiphvgmhvvvfxkunwb` projects. All 26 migrations
+in `supabase/migrations` are applied, the private `stack-media` and public
+`profile-media` buckets are in place, and all 20 Edge Functions are deployed.
+The iOS project contains the project URL and publishable key; Row Level
+Security protects that key. Server secrets and third-party provider
+credentials remain in Supabase only.
 
-The canonical migrations are ready at:
-
-`supabase/migrations/202608130001_initial_stacks_v1.sql`
-
-`supabase/migrations/202608130002_access_hardening.sql`
-
-Together they are the production source of truth for account profiles, Stacks,
-collaborators, items, pins, follows, private gift claims, import drafts, safety
-controls, affiliate click records, and private media storage. Read
-`docs/SUPABASE_SECURITY_RUNBOOK.md` before deploying them.
+The migrations in `supabase/migrations` are the production source of truth for
+account profiles, Stacks, collaborators, items, pins, follows, private gift
+claims, import drafts, safety controls, price alerts, push tokens, affiliate
+click records, and media storage. Read `docs/SUPABASE_SECURITY_RUNBOOK.md`
+before deploying them. The secrets each function needs are listed in Notion
+(Engineering Docs → Secrets & configuration checklist).
 
 ### Development environment
 
-- Supabase project reference: `iuovmgjcfwgwozfnsdgf`
-- Project URL: `https://iuovmgjcfwgwozfnsdgf.supabase.co`
+- Supabase project reference: `whyufyttlvpiwlunosjm`
+- Project URL: `https://whyufyttlvpiwlunosjm.supabase.co`
 - Database password, service-role key, provider credentials, and edge-function secrets must never be committed or sent in chat.
 
 ## Deploy Order
 
 1. Create separate Supabase **development**, **staging**, and **production** projects.
-2. Install the Supabase CLI and run `supabase link --project-ref iuovmgjcfwgwozfnsdgf` from this repository.
+2. Install the Supabase CLI and run `supabase link --project-ref whyufyttlvpiwlunosjm` from this repository.
 3. Review the migration in the Supabase SQL editor, then run `supabase db push` against development.
-4. Enable Apple and email authentication in Supabase Auth. Configure the iOS bundle ID, redirect URLs, and Apple provider credentials.
+4. Enable Apple, Google and email authentication in Supabase Auth. Configure the bundle ID `spot.stacks.app`, the redirect URL `stacks://auth/callback`, and the Apple and Google provider credentials.
 5. Create the private `stack-media` bucket through the migration. Do not make product photos public.
 6. Add edge-function secrets only in Supabase: retailer/search credentials, affiliate credentials, and any optional server-side image-removal token. Never add these to Xcode, Git, or an iOS build setting.
 7. Deploy functions to development, test every failure path, then repeat against staging before production.
@@ -47,7 +46,9 @@ The schema uses three exact values:
 
 - `private`: owner and accepted collaborators only.
 - `link_only`: fetched by an opaque `public_link_token` through `get_link_only_stack(token)`; it is not broadly readable through normal table queries.
-- `public`: eligible for Discover when the owner has enabled discovery.
+- `public`: eligible for Discover when the owner has enabled discovery, and shown on the owner's stacks.spot profile page.
+
+New Stacks default to `public` (migration `202610280002`); owners can switch any Stack to `link_only` or `private`.
 
 ### Media
 
@@ -61,20 +62,30 @@ The client stores image paths, not public URLs. Originals and removal output liv
 
 The Stack owner has no select policy on `gift_claims`. This preserves the core wishlist promise that owners cannot see who has claimed an item.
 
-## Required Edge Functions
+## Edge Functions
+
+All functions require a Supabase user JWT except `web-preview`,
+`revenuecat-webhook` and `check-price-alerts` (see `supabase/config.toml`).
 
 | Function | Caller | Responsibility | Status |
 | --- | --- | --- | --- |
-| `product-search` | authenticated app | Search provider wrapper and normalization | active; requires `SERPAPI_API_KEY` |
-| `link-parser` | authenticated app | SSRF-safe URL fetch, metadata extraction, image ranking | active |
-| `background-removal` | authenticated app / worker | Server fallback for removal | active; returns an honest retryable failure until configured, while iOS uses Apple Vision first |
-| `affiliate-link` | authenticated app | Validate target and wrap eligible retailer URL | active; preserves original URL until Sovrn credentials are configured |
-| `ai-description` | authenticated app | Generate an optional short editable description | active with deterministic fallback copy |
-| `media-url` | authenticated app | Authorize a Stack, then issue a short-lived private media URL | implemented |
-| `create-upload-url` | authenticated app | Authorize editor upload into the Stack owner media namespace | implemented |
-| `copy-public-stack` | authenticated app | Copy authorized public/link-only Stack rows and media into a private Stack | implemented |
-| `web-preview` | unauthenticated viewer | Resolve only public/link-only stacks to a read-only signed-media payload | deliberately disabled (`501`) until its public web experience is implemented |
-| `delete-account` | authenticated app | Remove nested private media and delete auth user | active |
+| `product-search` | app | Search provider wrapper and normalization | deployed; search is hidden in the app and `SERPAPI_API_KEY` is not set |
+| `link-parser` | app | SSRF-safe URL fetch, metadata extraction, image ranking | live |
+| `background-removal` | app | Server fallback for removal | placeholder; cutouts run on device with Apple Vision |
+| `affiliate-link` | app | Validate target and wrap eligible retailer URL | deployed; returns the original URL until Sovrn is configured |
+| `ai-description` | app | Optional short editable description | placeholder with deterministic fallback copy |
+| `media-url` | app | Authorize a Stack, then issue a short-lived private media URL | live |
+| `create-upload-url` | app | Authorize editor upload into the Stack owner media namespace | live |
+| `copy-public-stack` | app | Copy authorized public/link-only Stack rows and media into a private Stack | live |
+| `claim-gift` / `update-gift-claim` | app | Claim or release a wishlist item without revealing the claimer to the owner | live |
+| `create-collaboration-invite` / `preview-collaboration-invite` / `accept-collaboration-invite` | app | Invite, preview and accept Stack collaborators | live |
+| `register-push-token` | app | Store the device's APNs token | live |
+| `price-alerts` | app | Create, list and delete price alerts | live |
+| `check-price-alerts` | Cloudflare cron (hourly) | Re-check prices and send APNs pushes; requires `PRICE_CHECK_SECRET` | live once APNs secrets are set |
+| `web-preview` | stacks.spot (no JWT) | Public profile, board, pin and policy data for the website | live; policy pages return 503 until `STACKS_LEGAL_NAME` and `STACKS_SUPPORT_EMAIL` are set |
+| `sync-pro-entitlement` | app | Sync RevenueCat entitlement | parked while Stacks Pro is paused |
+| `revenuecat-webhook` | RevenueCat (no JWT) | Entitlement webhook | parked; returns 500 until its secret is set |
+| `delete-account` | app | Remove nested private media and delete auth user | live |
 
 ## Security Contract for Edge Functions
 
@@ -96,38 +107,19 @@ The Stack owner has no select policy on `gift_claims`. This preserves the core w
 | `BackgroundRemovalService` | Apple Vision first, then `background-removal` only as a fallback / asynchronous retry |
 | `StorageService` | Supabase Storage upload + signed URL service |
 | `AffiliateService` | `affiliate-link` edge function |
-| `ClaimService` | `gift_claims` through a narrow RPC/function that preserves owner privacy |
-| `CollaborationService` | `stack_collaborators` plus invitation edge function/email sender |
-| `RealtimeService` | Supabase Realtime subscription scoped to the active Stack |
+| `ClaimService` | `claim-gift` and `update-gift-claim`, which preserve owner privacy |
+| `CollaborationService` | `stack_collaborators` plus the three collaboration-invite functions |
+| `RealtimeService` | Supabase Realtime subscription scoped to the active Stack (not implemented yet; currently a no-op) |
 
 ## Remaining Production Configuration
 
 The deployed backend does not invent accounts or credentials. Before release:
 
-1. Enable Email OTP and Sign in with Apple in Supabase Auth, then add Apple’s
-   Services ID, key, team, and final bundle identifier.
-2. Set `SERPAPI_API_KEY` in Supabase Edge Function secrets to enable search.
-3. Add a server image-removal provider only if Apple Vision needs a fallback.
-4. Add Sovrn Commerce credentials before commissionable Buy links are enabled.
-5. Add support email, Privacy Policy URL, and Terms URL before App Store review.
-6. Implement `web-preview` before advertising browser-share links.
+1. Add the Apple and Google provider credentials and Resend SMTP in Supabase Auth.
+2. Set the APNs secrets (`APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID=spot.stacks.app`, `APNS_PRIVATE_KEY`) so price-alert pushes send.
+3. Set `STACKS_LEGAL_NAME`, `STACKS_SUPPORT_EMAIL` and `STACKS_PUBLIC_SITE_URL` so the policy pages on stacks.spot work.
+4. Prove RLS policies with two test accounts on a physical device.
 
-## Current Client Integration and Next Steps
-
-`StacksApp` now starts with `AppServices.configured()`. It selects the
-Supabase-backed service bundle whenever the public project URL and anon key are
-available, while retaining `AppServices.mock()` for offline previews and UI
-work. The live service layer covers auth, Stack CRUD, pins, follows, copying,
-and final Storage persistence; see `docs/CODEX_HANDOFF.md` for the exact
-boundary.
-
-- Prove RLS policies with two test accounts before beta.
-- Enable Email/Magic Link and Apple in Supabase, configure the redirect URL,
-  then test the live service bundle on a physical device.
-- Rename remaining user-facing Bookmark labels and compatibility code paths to
-  Pin in a focused pass.
-- Implement gift claims, collaboration invitations, Realtime subscriptions,
-  and profile/avatar edits before representing them as live features.
-- Add Development, Staging, and Production configurations. Commit only public
-  project URL and publishable key configuration; inject sensitive server
-  secrets in Supabase.
+Later, and only when the features are switched back on: `SERPAPI_API_KEY` for
+product search, Sovrn credentials for commissionable Buy links, and the
+RevenueCat secrets for Stacks Pro. Open work is tracked in the Notion Backlog.

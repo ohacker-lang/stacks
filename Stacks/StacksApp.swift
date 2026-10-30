@@ -86,12 +86,14 @@ struct StacksApp: App {
                 #endif
                 .task(id: session.currentAccountID) {
                     guard let accountID = session.currentAccountID else {
+                        Analytics.reset()
                         await pro.setAccount(nil)
                         await priceAlerts.setAccount(nil)
                         return
                     }
                     // RevenueCat starts after authentication so its app user ID
                     // is the same Supabase UUID used by server-side Pro limits.
+                    Analytics.identify(accountID)
                     await pro.setAccount(accountID)
                     await pro.start()
                     await priceAlerts.setAccount(accountID)

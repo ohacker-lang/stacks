@@ -189,6 +189,7 @@ final class AppSession {
             let session = try await services.auth.signInWithApple()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
             state = .onboarding(session)
+            Analytics.capture("signed_in", ["method": "apple", "is_new_user": !session.hasCompletedOnboarding])
             SharedStackDestinationStore.clear()
             lastError = nil
             services.haptics.notification(.success)
@@ -210,6 +211,7 @@ final class AppSession {
             let session = try await services.auth.signInWithGoogle()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
             state = .onboarding(session)
+            Analytics.capture("signed_in", ["method": "google", "is_new_user": !session.hasCompletedOnboarding])
             SharedStackDestinationStore.clear()
             lastError = nil
             services.haptics.notification(.success)
@@ -233,6 +235,7 @@ final class AppSession {
             case .authenticated(let session):
                 try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
                 state = .onboarding(session)
+                Analytics.capture("signed_in", ["method": "email", "is_new_user": !session.hasCompletedOnboarding])
                 SharedStackDestinationStore.clear()
                 pendingEmailSignIn = false
             case .linkSent:
@@ -278,6 +281,7 @@ final class AppSession {
             }
             pendingEmailSignIn = false
             lastError = nil
+            Analytics.capture("signed_in", ["method": "email", "is_new_user": !authSession.hasCompletedOnboarding])
             if authSession.hasCompletedOnboarding {
                 let profile = try await services.profiles.currentProfile(for: authSession)
                 if SharedStackDestinationStore.ownerID != profile.id {
@@ -307,6 +311,7 @@ final class AppSession {
             let profile = try await services.profiles.currentProfile(for: completed)
             SharedStackDestinationStore.clear()
             state = .signedIn(profile)
+            Analytics.capture("onboarding_completed")
             Self.cache(profile: profile)
             await preparePendingCollaborationInviteIfPossible()
             pendingEmailSignIn = false
@@ -324,6 +329,7 @@ final class AppSession {
     func signOut() async {
         do {
             try await services.auth.signOut()
+            Analytics.capture("signed_out")
             state = .signedOut
             Self.cache(profile: nil)
             SharedStackDestinationStore.clear()
@@ -419,6 +425,7 @@ final class AppSession {
     func requestAccountDeletion() async -> Bool {
         do {
             try await services.auth.requestAccountDeletion()
+            Analytics.capture("account_deleted")
             state = .signedOut
             Self.cache(profile: nil)
             SharedStackDestinationStore.clear()
