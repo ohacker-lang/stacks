@@ -1229,7 +1229,9 @@ private struct StackSettingsOverlay: View {
                                 onSave(stack.title, visibility, newValue)
                             }
                     },
-                    action: {}
+                    // The card's button receives taps on the switch too, so it
+                    // has to flip the value itself.
+                    action: { wishlistMode.toggle() }
                 )
 
                 if wishlistMode {
@@ -1296,7 +1298,7 @@ private struct StackSettingsOverlay: View {
                                 onSetCollaborationEnabled(enabled)
                             }
                     },
-                    action: {}
+                    action: { collaborationEnabled.toggle() }
                 )
 
                 if collaborationEnabled {
