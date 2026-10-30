@@ -63,8 +63,10 @@ struct StickerImageView: View {
             Image(assetName)
                 .resizable()
                 .scaledToFit()
-        } else if (!requiresCutout || CuratedStackCatalog.isCuratedStack(item.stackID)),
+        } else if (!requiresCutout || CuratedStackCatalog.isCuratedStack(item.stackID) || item.removalStatus == .failed),
                   let imageURL = item.originalImageURL {
+            // A failed cutout falls back to the original photo so the item
+            // never sits in the Stack as a placeholder box.
             if imageURL.isFileURL, let image = UIImage(contentsOfFile: imageURL.path) {
                 Image(uiImage: image)
                     .resizable()
