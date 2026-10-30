@@ -1,5 +1,7 @@
 # Website waitlist
 
+> **Notion is the source of truth.** The current, corrected version of this document lives in Notion: [Waitlist](https://app.notion.com/p/40858338d845814aa2bac067082f9536). This file is the original import and may be out of date (for example, new Stacks are now public by default, sign-in includes Google, Stacks Pro is paused and price alerts are in scope). Update Notion first.
+
 The public `/waitlist` page saves signups in Supabase `public.waitlist_entries`.
 Open the project's **Table Editor → waitlist_entries** and sort by `created_at`
 to track signups in order. The table contains the requested `username`, `email`,
