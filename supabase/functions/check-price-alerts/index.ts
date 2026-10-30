@@ -18,7 +18,8 @@ type DueAlert = {
 
 serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
-  const expected = requiredEnv("PRICE_CHECK_SECRET");
+  const expected = Deno.env.get("PRICE_CHECK_SECRET");
+  if (!expected) return jsonResponse({ error: "Price checks are not configured yet." }, 503);
   if (req.headers.get("Authorization") !== `Bearer ${expected}`) return jsonResponse({ error: "Unauthorized." }, 401);
   const admin = serviceClient();
   const now = new Date();
@@ -83,13 +84,16 @@ serve(async (req) => {
     }).select("id").maybeSingle();
     if (eventError || !event) continue;
     triggered += 1;
-    const delivered = await notifyUser(alert, current, previous);
+    // A bad APNs key must not stop the rest of the batch from being checked.
+    const delivered = await notifyUser(alert, current, previous).catch(() => false);
     if (delivered) await admin.from("price_alert_events").update({ delivered_at: new Date().toISOString() }).eq("id", event.id);
   }
   return jsonResponse({ checked: alerts.length, products: prices.size, triggered });
 });
 
 async function notifyUser(alert: DueAlert, current: number, previous: number): Promise<boolean> {
+  // Without APNs credentials the drop is still recorded; it just isn't pushed.
+  if (!APNS_SECRETS.every((name) => Deno.env.get(name))) return false;
   const admin = serviceClient();
   const { data: preference } = await admin.from("notification_preferences").select("price_alerts_enabled")
     .eq("user_id", alert.user_id).maybeSingle();
@@ -110,6 +114,8 @@ async function notifyUser(alert: DueAlert, current: number, previous: number): P
   }
   return delivered;
 }
+
+const APNS_SECRETS = ["APNS_KEY_ID", "APNS_TEAM_ID", "APNS_BUNDLE_ID", "APNS_PRIVATE_KEY"];
 
 async function sendAPNS(token: string, environment: string, payload: unknown): Promise<Response> {
   const jwt = await apnsJWT();

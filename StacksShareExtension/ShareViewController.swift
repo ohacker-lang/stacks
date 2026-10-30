@@ -35,14 +35,17 @@ final class ShareViewController: UIViewController {
         // open, even when Grailed or another shop rejects server-side fetches.
         // A short deadline keeps the share sheet responsive for other apps.
         pageProvider.loadItem(forTypeIdentifier: UTType.propertyList.identifier, options: nil) { item, _ in
-            let dictionary = item as? [String: Any]
+            let dictionary = Self.propertyListDictionary(from: item)
             let results = dictionary?[NSExtensionJavaScriptPreprocessingResultsKey] as? [String: Any]
             let preview = (results ?? dictionary).flatMap(SharedPagePreview.init(dictionary:))
             DispatchQueue.main.async { [weak self] in
                 self?.continueCapture(title: title, pagePreview: preview)
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        // Safari's page is the only source of the link when it is the sole
+        // attachment, so wait longer for it than when a plain URL is also shared.
+        let deadline: TimeInterval = providers.isEmpty ? 6 : 1.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + deadline) { [weak self] in
             self?.continueCapture(title: title, pagePreview: nil)
         }
     }
@@ -91,6 +94,20 @@ final class ShareViewController: UIViewController {
             self.activeProviderRequest = nil
             self.loadSharedURL(at: index + 1, title: title, pagePreview: pagePreview)
         }
+    }
+
+    // Safari delivers the page results either as a dictionary or as archived
+    // property-list data, depending on the OS version.
+    nonisolated private static func propertyListDictionary(from item: NSSecureCoding?) -> [String: Any]? {
+        if let dictionary = item as? [String: Any] { return dictionary }
+        guard let data = item as? Data else { return nil }
+        if let archived = try? NSKeyedUnarchiver.unarchivedObject(
+            ofClasses: [NSDictionary.self, NSString.self, NSNumber.self, NSArray.self, NSNull.self],
+            from: data
+        ) as? [String: Any] {
+            return archived
+        }
+        return (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
     }
 
     nonisolated private static func sharedURL(from item: NSSecureCoding?) -> URL? {

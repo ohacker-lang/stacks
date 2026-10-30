@@ -82,17 +82,11 @@ struct AppServices: @unchecked Sendable {
     }
 
     private static func unmeasured() -> AppServices {
-        #if STACKS_PERSONAL_TEAM_DEMO
-        // Free Personal Teams cannot provision Sign in with Apple or App
-        // Groups. The Debug configuration therefore runs a self-contained
-        // local account while Release remains fully production-backed.
-        return mock()
-        #else
         #if DEBUG
+        // Launch with STACKS_PRO_LOCAL_STOREKIT=1 for the offline demo account.
         if ProcessInfo.processInfo.environment["STACKS_PRO_LOCAL_STOREKIT"] == "1" { return mock() }
         #endif
         return SupabaseConfiguration.fromAppBundle() == nil ? mock() : supabaseBackedPlaceholder()
-        #endif
     }
 }
 
