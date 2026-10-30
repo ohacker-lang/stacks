@@ -1,6 +1,9 @@
 var ExtensionPreprocessingJS = {};
 
-ExtensionPreprocessingJS.run = function (complete) {
+// Safari passes an object whose completionFunction returns the results to the
+// extension. Calling the object itself throws, and Safari then sends nothing.
+ExtensionPreprocessingJS.run = function (parameters) {
+  var complete = parameters.completionFunction;
   function meta(name) {
     var element = document.querySelector('meta[property="' + name + '"], meta[name="' + name + '"]');
     return element ? (element.getAttribute("content") || "").trim() : "";
