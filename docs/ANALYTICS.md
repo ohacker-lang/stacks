@@ -34,7 +34,7 @@ Never put a PostHog **personal** API key (`phx_…`) in the app, the website or 
 | Metric | How |
 | --- | --- |
 | DAU / WAU / MAU | Unique identified users with any event (`Application Opened` is captured automatically). |
-| Activation funnel | `signed_in` → `onboarding_completed` → `stack_created` → `item_saved` → `stack_shared` |
+| Activation funnel | `signed_in` → `profile_set_up` → `onboarding_completed` → `stack_created` → `item_saved` → `stack_shared` |
 | Retention | Users returning with `Application Opened` or `item_saved` in week N. |
 | Journeys / paths | `$screen` events plus the events below. |
 | Import quality | `item_import_finished.outcome` and `background_removal_finished.result` by `source` / `retailer_host`. |
@@ -48,6 +48,7 @@ Never put a PostHog **personal** API key (`phx_…`) in the app, the website or 
 | `$screen` | `$screen_name` | A main screen appears: Home, Discover, Stack, Product, Profile, Settings, Add, Onboarding. |
 | `signed_in` | `method` (apple, google, email), `is_new_user` | Sign-in succeeds. |
 | `onboarding_step_viewed` | `step` | Each onboarding page. |
+| `profile_set_up` | `has_photo` | The name and @handle step in onboarding is saved. |
 | `onboarding_completed` | | Onboarding finishes. |
 | `signed_out` | | Sign out. |
 | `account_deleted` | | Account deletion succeeds. |
