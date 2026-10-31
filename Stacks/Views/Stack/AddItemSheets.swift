@@ -1410,6 +1410,20 @@ private struct ProductImportDetailScreen: View {
             .foregroundStyle(Color.stacksInk)
             .padding(.horizontal, 22)
             .padding(.top, 8)
+            .padding(.bottom, 16)
+            // Scrolled text used to run straight into these buttons.
+            .background {
+                LinearGradient(
+                    stops: [
+                        .init(color: .white, location: 0),
+                        .init(color: .white, location: 0.7),
+                        .init(color: .white.opacity(0), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: .top)
+            }
         }
         .task {
             showsEditableShimmer = true
