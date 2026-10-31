@@ -62,6 +62,7 @@ struct RootView: View {
                 LaunchView()
             case .signedOut, .onboarding:
                 OnboardingView()
+                    .onAppear { Analytics.screen("Onboarding") }
             case .signedIn:
                 AppShellView()
                     .dismissKeyboardOnTap()

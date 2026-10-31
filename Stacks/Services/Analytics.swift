@@ -18,7 +18,7 @@ enum Analytics {
               key.hasPrefix("phc_") else { return }
         let host = (Bundle.main.object(forInfoDictionaryKey: "STACKS_POSTHOG_HOST") as? String)?.nonEmptyTrimmed
             ?? "https://us.i.posthog.com"
-        let config = PostHogConfig(apiKey: key, host: host)
+        let config = PostHogConfig(projectToken: key, host: host)
         config.captureApplicationLifecycleEvents = true
         // SwiftUI screens are recorded explicitly with `screen(_:)`.
         config.captureScreenViews = false

@@ -270,12 +270,14 @@ struct ProfileView: View {
         guard !isCurrentProfile, let user = session.currentUser else { return }
         let previous = isFollowing
         isFollowing.toggle()
+        let event = isFollowing ? "creator_followed" : "creator_unfollowed"
         viewModel.followerCount = max(0, viewModel.followerCount + (isFollowing ? 1 : -1))
         services.haptics.impact(.light)
 
         Task {
             do {
                 _ = try await services.stacks.toggleFollow(authorID: profile.id, userID: user.id)
+                Analytics.capture(event)
             } catch {
                 isFollowing = previous
                 viewModel.followerCount = max(0, viewModel.followerCount + (previous ? 1 : -1))
@@ -1072,6 +1074,7 @@ private struct ProfileSettingsSheet: View {
                 }
             }
         }
+        .onAppear { Analytics.screen("Settings") }
     }
 
     private func settingsRow(
