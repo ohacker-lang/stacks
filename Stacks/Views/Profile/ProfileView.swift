@@ -76,18 +76,22 @@ struct ProfileView: View {
     @State private var safetyMessage: String?
     @State private var profileShareURL: URL?
     @State private var isShowingProfileShare = false
+    @State private var peopleSheet: PeopleSheet.Mode?
 
     let profile: UserProfile
     let onOpenStack: (Stack) -> Void
+    let onOpenProfile: (UserProfile) -> Void
     let onNavigateBack: () -> Void
 
     init(
         profile: UserProfile,
         onOpenStack: @escaping (Stack) -> Void,
+        onOpenProfile: @escaping (UserProfile) -> Void,
         onNavigateBack: @escaping () -> Void
     ) {
         self.profile = profile
         self.onOpenStack = onOpenStack
+        self.onOpenProfile = onOpenProfile
         self.onNavigateBack = onNavigateBack
         _editableProfile = State(initialValue: profile)
     }
@@ -109,6 +113,7 @@ struct ProfileView: View {
             stacks: viewModel.stacks,
             heroItems: heroItems,
             followerCount: viewModel.followerCount,
+            followingCount: viewModel.followingCount,
             productCount: viewModel.productCount,
             isCurrentProfile: isCurrentProfile,
             isFollowing: isFollowing,
@@ -117,6 +122,8 @@ struct ProfileView: View {
                 onNavigateBack()
             },
             onEdit: { isEditingProfile = true },
+            onFindPeople: { peopleSheet = .search },
+            onShowPeople: { peopleSheet = .list($0) },
             onOpenSettings: { isShowingSettings = true },
             onShareProfile: {
                 // Every account has a public page at stacks.spot/username.
@@ -230,6 +237,19 @@ struct ProfileView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(item: $peopleSheet) { mode in
+            PeopleSheet(profileID: profile.id, mode: mode) { person in
+                peopleSheet = nil
+                // Let the sheet finish closing before pushing the profile.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    onOpenProfile(person)
+                }
+            } onFollowChange: {
+                Task { await viewModel.loadFollowCounts(services: services, profileID: profile.id) }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $isShowingProfileShare) {
             if let profileShareURL {
                 ProfileURLShareSheet(url: profileShareURL)
@@ -287,7 +307,7 @@ struct ProfileView: View {
         Task {
             do {
                 _ = try await services.stacks.toggleFollow(authorID: profile.id, userID: user.id)
-                Analytics.capture(event)
+                Analytics.capture(event, ["source": "profile"])
             } catch {
                 isFollowing = previous
                 viewModel.followerCount = max(0, viewModel.followerCount + (previous ? 1 : -1))
@@ -457,11 +477,14 @@ private struct ProfileRedesignScreen: View {
     let stacks: [Stack]
     let heroItems: [StackItem]
     let followerCount: Int
+    let followingCount: Int
     let productCount: Int
     let isCurrentProfile: Bool
     let isFollowing: Bool
     let onBack: () -> Void
     let onEdit: () -> Void
+    let onFindPeople: () -> Void
+    let onShowPeople: (FollowListKind) -> Void
     let onOpenSettings: () -> Void
     let onShareProfile: () -> Void
     let onOpenStack: (Stack) -> Void
@@ -474,60 +497,16 @@ private struct ProfileRedesignScreen: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // Short enough that the name and Edit profile / Follow sit above
-                // the floating tab bar on a 6.1" iPhone without scrolling.
-                ProfileHeroCollage(items: heroItems)
-                    .frame(height: 430)
-                    .overlay(alignment: .topLeading) {
-                        Button(action: onBack) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(Color.stacksInk)
-                                .frame(width: 42, height: 42)
-                                .background(.white.opacity(0.88), in: Circle())
-                                .overlay { Circle().stroke(Color.stacksInk.opacity(0.08), lineWidth: 1) }
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.leading, 20)
-                        .padding(.top, 7)
-                        .accessibilityLabel("Back")
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if isCurrentProfile {
-                            Menu {
-                                Button("Settings", action: onOpenSettings)
-                                Button("Share profile", systemImage: "square.and.arrow.up", action: onShareProfile)
-                            } label: {
-                                ProfileMoreButton()
-                            }
-                            .padding(20)
-                        } else {
-                            Menu {
-                                if let profileURL = URL(string: "https://stacks.spot/\(profile.username)") {
-                                    ShareLink(item: profileURL) {
-                                        Label("Share profile", systemImage: "square.and.arrow.up")
-                                    }
-                                    .simultaneousGesture(TapGesture().onEnded { Analytics.capture("profile_shared", ["own": false]) })
-                                }
-                                if !CuratedStackCatalog.isCuratedProfile(profile.id) {
-                                    Button("Report profile", systemImage: "flag") {
-                                        isShowingReportReasons = true
-                                    }
-                                    Button("Block @\(profile.username)", systemImage: "person.crop.circle.badge.xmark", role: .destructive) {
-                                        isConfirmingBlock = true
-                                    }
-                                }
-                            } label: {
-                                ProfileMoreButton()
-                            }
-                            .padding(20)
-                            .accessibilityLabel("More options for \(profile.displayName)")
-                        }
-                    }
+                // A short collage of recent adds. Without any it is skipped,
+                // so a new profile starts with the name, not a blank band.
+                if !heroItems.isEmpty {
+                    ProfileHeroCollage(items: heroItems)
+                        .frame(height: 240)
+                }
 
                 VStack(spacing: 0) {
                     AvatarView(profile: profile, size: 92, localImageData: avatarData)
-                        .padding(.top, 18)
+                        .padding(.top, heroItems.isEmpty ? 4 : 0)
                         .padding(.bottom, 14)
 
                     VStack(spacing: 2) {
@@ -548,7 +527,8 @@ private struct ProfileRedesignScreen: View {
                         if isCurrentProfile {
                             Button("Edit profile", action: onEdit)
                                 .buttonStyle(ProfilePillButtonStyle(isPrimary: false))
-                                .frame(maxWidth: 330)
+                            Button("Find people", action: onFindPeople)
+                                .buttonStyle(ProfilePillButtonStyle(isPrimary: true))
                         } else if !CuratedStackCatalog.isCuratedProfile(profile.id) {
                             Button(isFollowing ? "Following" : "Follow", action: onToggleFollow)
                                 .buttonStyle(ProfilePillButtonStyle(isPrimary: !isFollowing))
@@ -561,11 +541,18 @@ private struct ProfileRedesignScreen: View {
                     .padding(.top, 19)
 
                     HStack(spacing: 0) {
-                        ProfileStat(value: followerCount, singularTitle: "Follower", pluralTitle: "Followers")
+                        Button { onShowPeople(.followers) } label: {
+                            ProfileStat(value: followerCount, singularTitle: "Follower", pluralTitle: "Followers")
+                        }
+                        .buttonStyle(.plain)
+                        Button { onShowPeople(.following) } label: {
+                            ProfileStat(value: followingCount, singularTitle: "Following", pluralTitle: "Following")
+                        }
+                        .buttonStyle(.plain)
                         ProfileStat(value: stacks.count, singularTitle: "Stack", pluralTitle: "Stacks")
                         ProfileStat(value: productCount, singularTitle: "Add", pluralTitle: "Adds")
                     }
-                    .padding(.top, 31)
+                    .padding(.top, 24)
 
                     if !profile.bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text(profile.bio)
@@ -588,7 +575,7 @@ private struct ProfileRedesignScreen: View {
                             .foregroundStyle(Color.stacksMutedInk)
                     }
                     .foregroundStyle(Color.stacksInk)
-                    .padding(.top, 34)
+                    .padding(.top, 28)
 
                     if stacks.isEmpty {
                         ContentUnavailableView(
@@ -615,6 +602,11 @@ private struct ProfileRedesignScreen: View {
                 .padding(.bottom, 120)
             }
         }
+        // Pinned below the status bar so Back and More stay reachable
+        // however far the profile scrolls.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            topBar
+        }
         .confirmationDialog("Why are you reporting this profile?", isPresented: $isShowingReportReasons) {
             Button("Spam") { onReport("Spam") }
             Button("Harassment") { onReport("Harassment") }
@@ -626,6 +618,56 @@ private struct ProfileRedesignScreen: View {
             Text("You won't see this person's public Stacks.")
         }
         .background(Color.white.ignoresSafeArea())
+    }
+}
+
+private extension ProfileRedesignScreen {
+    var topBar: some View {
+        HStack {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(Color.stacksInk)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.88), in: Circle())
+                    .overlay { Circle().stroke(Color.stacksInk.opacity(0.08), lineWidth: 1) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+
+            Spacer()
+
+            if isCurrentProfile {
+                Menu {
+                    Button("Settings", action: onOpenSettings)
+                    Button("Share profile", systemImage: "square.and.arrow.up", action: onShareProfile)
+                } label: {
+                    ProfileMoreButton()
+                }
+            } else {
+                Menu {
+                    if let profileURL = URL(string: "https://stacks.spot/\(profile.username)") {
+                        ShareLink(item: profileURL) {
+                            Label("Share profile", systemImage: "square.and.arrow.up")
+                        }
+                        .simultaneousGesture(TapGesture().onEnded { Analytics.capture("profile_shared", ["own": false]) })
+                    }
+                    if !CuratedStackCatalog.isCuratedProfile(profile.id) {
+                        Button("Report profile", systemImage: "flag") {
+                            isShowingReportReasons = true
+                        }
+                        Button("Block @\(profile.username)", systemImage: "person.crop.circle.badge.xmark", role: .destructive) {
+                            isConfirmingBlock = true
+                        }
+                    }
+                } label: {
+                    ProfileMoreButton()
+                }
+                .accessibilityLabel("More options for \(profile.displayName)")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 }
 
@@ -651,7 +693,7 @@ private struct ProfileHeroCollage: View {
                         let placement = placements[index]
                         StickerImageView(
                             item: item,
-                            size: placement.2,
+                            size: placement.2 * proxy.size.height / 430,
                             requiresCutout: true,
                             shadowOpacity: 0.07,
                             shadowRadius: 8,
@@ -726,13 +768,15 @@ private struct ProfileStat: View {
     var body: some View {
         VStack(spacing: 5) {
             Text(value.formatted(.number.notation(.compactName)))
-                .font(.system(size: 28, weight: .bold, design: .default))
+                .font(.system(size: 24, weight: .bold, design: .default))
                 .tracking(-0.8)
             Text(value == 1 ? singularTitle : pluralTitle)
                 .font(.system(size: 14, weight: .regular, design: .default))
                 .foregroundStyle(Color.stacksMutedInk)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 }
 
@@ -1202,6 +1246,174 @@ private struct AccountInfoSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+}
+
+/// Followers or Following for a profile, or a search for people to follow.
+/// Rows open the person's profile; Follow works in place.
+struct PeopleSheet: View {
+    enum Mode: Identifiable, Hashable {
+        case list(FollowListKind)
+        case search
+
+        var id: String {
+            switch self {
+            case .list(let kind): kind.rawValue
+            case .search: "search"
+            }
+        }
+    }
+
+    @Environment(AppSession.self) private var session
+    @Environment(\.appServices) private var services
+    @Environment(\.dismiss) private var dismiss
+    @State private var people: [UserProfile] = []
+    @State private var query = ""
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    let profileID: UUID
+    let mode: Mode
+    let onOpenProfile: (UserProfile) -> Void
+    let onFollowChange: () -> Void
+
+    private var title: String {
+        switch mode {
+        case .list(let kind): kind.title
+        case .search: "Find people"
+        }
+    }
+
+    private var emptyTitle: String {
+        switch mode {
+        case .list(.followers): "No followers yet"
+        case .list(.following): "Not following anyone yet"
+        case .search: query.isEmpty ? "Search for people" : "No one found"
+        }
+    }
+
+    private var emptyMessage: String {
+        switch mode {
+        case .list: "Find friends by name or @handle to follow their Stacks."
+        case .search: query.isEmpty ? "Type a name or @handle." : "Try another name or @handle."
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading && people.isEmpty {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if people.isEmpty {
+                    ContentUnavailableView(
+                        errorMessage == nil ? emptyTitle : "Couldn't load people",
+                        systemImage: "person.2",
+                        description: Text(errorMessage ?? emptyMessage)
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            if mode == .search && query.isEmpty {
+                                Text("Suggested")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.stacksMutedInk)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            ForEach(people) { person in
+                                DiscoverCreatorRow(
+                                    creator: person,
+                                    showsFollow: person.id != session.currentUser?.id,
+                                    onOpen: { onOpenProfile(person) },
+                                    onFollow: { toggleFollow(person) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                    }
+                }
+            }
+            .background(Color.white)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .modifier(PeopleSearchField(isEnabled: mode == .search, query: $query))
+        }
+        .task(id: query) {
+            if mode == .search && !query.isEmpty {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+            }
+            await load()
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            switch mode {
+            case .list(let kind):
+                people = try await services.profiles.followList(profileID: profileID, kind: kind)
+            case .search:
+                var cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleanQuery.hasPrefix("@") { cleanQuery.removeFirst() }
+                people = cleanQuery.isEmpty
+                    ? try await services.profiles.suggestedCreators()
+                    : try await services.profiles.searchCreators(query: cleanQuery)
+            }
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            people = []
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func toggleFollow(_ person: UserProfile) {
+        guard let user = session.currentUser,
+              let index = people.firstIndex(where: { $0.id == person.id }) else { return }
+        let wasFollowing = people[index].isFollowing
+        people[index].isFollowing.toggle()
+        services.haptics.impact(.light)
+        Task {
+            do {
+                _ = try await services.stacks.toggleFollow(authorID: person.id, userID: user.id)
+                Analytics.capture(
+                    wasFollowing ? "creator_unfollowed" : "creator_followed",
+                    ["source": mode == .search ? "people_search" : "people_list"]
+                )
+                onFollowChange()
+            } catch {
+                if let index = people.firstIndex(where: { $0.id == person.id }) {
+                    people[index].isFollowing = wasFollowing
+                }
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+private struct PeopleSearchField: ViewModifier {
+    let isEnabled: Bool
+    @Binding var query: String
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.searchable(
+                text: $query,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Name or @handle"
+            )
+        } else {
+            content
         }
     }
 }

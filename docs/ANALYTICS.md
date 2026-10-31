@@ -57,7 +57,7 @@ Never put a PostHog **personal** API key (`phx_…`) in the app, the website or 
 | `stack_deleted` | | |
 | `stack_copied` | | Someone copies a public Stack. |
 | `stack_pinned` / `stack_unpinned` | | |
-| `creator_followed` / `creator_unfollowed` | | |
+| `creator_followed` / `creator_unfollowed` | `source` (profile, discover, people_search, people_list) | A Follow button is tapped and the change saves. |
 | `item_import_started` | `source` (link, barcode) | A link or barcode lookup begins. |
 | `item_import_finished` | `source`, `outcome` (ok, no_image, failed), `has_price`, `retailer_host`, `duration_ms` | The lookup returns. |
 | `background_removal_finished` | `result` (ok, failed), `source`, `duration_ms` | A cutout attempt ends. |

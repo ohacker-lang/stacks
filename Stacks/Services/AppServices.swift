@@ -22,7 +22,7 @@ struct AppServices: @unchecked Sendable {
         return AppServices(
             auth: MockAuthService(seed: seed),
             stacks: stackRepository,
-            profiles: MockProfileRepository(seed: seed),
+            profiles: MockProfileRepository(seed: seed, stacks: stackRepository),
             productSearch: EdgeFunctionProductSearchService(),
             backgroundRemoval: AppleVisionBackgroundRemovalService(),
             affiliate: MockAffiliateService(),

@@ -178,8 +178,9 @@ struct DiscoverView: View {
 
 }
 
-private struct DiscoverCreatorRow: View {
+struct DiscoverCreatorRow: View {
     let creator: UserProfile
+    var showsFollow = true
     let onOpen: () -> Void
     let onFollow: () -> Void
 
@@ -204,7 +205,9 @@ private struct DiscoverCreatorRow: View {
 
             Spacer()
 
-            if CuratedStackCatalog.isCuratedProfile(creator.id) {
+            if !showsFollow {
+                EmptyView()
+            } else if CuratedStackCatalog.isCuratedProfile(creator.id) {
                 Text("Curated")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.stacksMutedInk)

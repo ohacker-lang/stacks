@@ -635,6 +635,8 @@ private extension View {
             case .profile(let profile):
                 ProfileView(profile: profile) { stack in
                     path.wrappedValue.append(.stack(stack))
+                } onOpenProfile: { person in
+                    path.wrappedValue.append(.profile(person))
                 } onNavigateBack: {
                     guard !path.wrappedValue.isEmpty else { return }
                     path.wrappedValue.removeLast()
