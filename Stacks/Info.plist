@@ -9,6 +9,8 @@
 -->
 <plist version="1.0">
 <dict>
+	<key>STACKS_GOOGLE_IOS_CLIENT_ID</key>
+	<string>$(INFOPLIST_KEY_STACKS_GOOGLE_IOS_CLIENT_ID)</string>
 	<key>STACKS_SUPABASE_URL</key>
 	<string>$(INFOPLIST_KEY_STACKS_SUPABASE_URL)</string>
 	<key>STACKS_SUPABASE_ANON_KEY</key>

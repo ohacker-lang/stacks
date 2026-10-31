@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Observation
 
@@ -188,12 +189,10 @@ final class AppSession {
         do {
             let session = try await services.auth.signInWithApple()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
-            state = .onboarding(session)
-            Analytics.capture("signed_in", ["method": "apple", "is_new_user": !session.hasCompletedOnboarding])
-            SharedStackDestinationStore.clear()
-            lastError = nil
-            services.haptics.notification(.success)
+            try await finishSignIn(session, method: "apple")
             return true
+        } catch let error as ASAuthorizationError where error.code == .canceled {
+            return false
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
@@ -210,12 +209,13 @@ final class AppSession {
         do {
             let session = try await services.auth.signInWithGoogle()
             try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
-            state = .onboarding(session)
-            Analytics.capture("signed_in", ["method": "google", "is_new_user": !session.hasCompletedOnboarding])
-            SharedStackDestinationStore.clear()
-            lastError = nil
-            services.haptics.notification(.success)
+            try await finishSignIn(session, method: "google")
             return true
+        } catch is CancellationError {
+            // Closing Google's sheet is not an error worth showing.
+            return false
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            return false
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
@@ -234,24 +234,40 @@ final class AppSession {
             switch result {
             case .authenticated(let session):
                 try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
-                state = .onboarding(session)
-                Analytics.capture("signed_in", ["method": "email", "is_new_user": !session.hasCompletedOnboarding])
-                SharedStackDestinationStore.clear()
-                pendingEmailSignIn = false
+                try await finishSignIn(session, method: "email")
             case .linkSent:
                 pendingEmailSignIn = true
                 UserDefaults.standard.set(
                     StacksLegalAgreement.version,
                     forKey: Self.pendingLegalAcceptanceDefaultsKey
                 )
+                lastError = nil
+                services.haptics.notification(.success)
             }
-            lastError = nil
-            services.haptics.notification(.success)
             return true
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
             return false
+        }
+    }
+
+    /// Signs in with the code from the sign-in email, for when the link
+    /// can't open the app (another device, or a mail app's own browser).
+    /// Returns an error message to show, or nil once signed in.
+    func verifyEmailCode(_ code: String, email: String) async -> String? {
+        do {
+            let session = try await services.auth.verifyEmailCode(code, email: email)
+            try await services.auth.recordLegalAcceptance(for: session.userID, version: StacksLegalAgreement.version)
+            UserDefaults.standard.removeObject(forKey: Self.pendingLegalAcceptanceDefaultsKey)
+            try await finishSignIn(session, method: "email")
+            return nil
+        } catch let error as URLError where error.code == .notConnectedToInternet {
+            services.haptics.notification(.error)
+            return "You're offline. Check your connection and try again."
+        } catch {
+            services.haptics.notification(.error)
+            return "That code didn't work. Check it, or send a new one."
         }
     }
 
@@ -279,26 +295,32 @@ final class AppSession {
                 try await services.auth.recordLegalAcceptance(for: authSession.userID, version: version)
                 UserDefaults.standard.removeObject(forKey: Self.pendingLegalAcceptanceDefaultsKey)
             }
-            pendingEmailSignIn = false
-            lastError = nil
-            Analytics.capture("signed_in", ["method": "email", "is_new_user": !authSession.hasCompletedOnboarding])
-            if authSession.hasCompletedOnboarding {
-                let profile = try await services.profiles.currentProfile(for: authSession)
-                if SharedStackDestinationStore.ownerID != profile.id {
-                    SharedStackDestinationStore.clear()
-                }
-                state = .signedIn(profile)
-                Self.cache(profile: profile)
-                await preparePendingCollaborationInviteIfPossible()
-            } else {
-                state = .onboarding(authSession)
-                SharedStackDestinationStore.clear()
-            }
-            services.haptics.notification(.success)
+            try await finishSignIn(authSession, method: "email")
         } catch {
             lastError = error.localizedDescription
             services.haptics.notification(.error)
         }
+    }
+
+    /// Returning members go straight to their library; only new accounts
+    /// see onboarding.
+    private func finishSignIn(_ authSession: AuthSession, method: String) async throws {
+        Analytics.capture("signed_in", ["method": method, "is_new_user": !authSession.hasCompletedOnboarding])
+        pendingEmailSignIn = false
+        if authSession.hasCompletedOnboarding {
+            let profile = try await services.profiles.currentProfile(for: authSession)
+            if SharedStackDestinationStore.ownerID != profile.id {
+                SharedStackDestinationStore.clear()
+            }
+            state = .signedIn(profile)
+            Self.cache(profile: profile)
+            await preparePendingCollaborationInviteIfPossible()
+        } else {
+            state = .onboarding(authSession)
+            SharedStackDestinationStore.clear()
+        }
+        lastError = nil
+        services.haptics.notification(.success)
     }
 
     @discardableResult
