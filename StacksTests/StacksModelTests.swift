@@ -201,6 +201,21 @@ final class StacksModelTests: XCTestCase {
         XCTAssertEqual(listing.alerts.first?.currentPrice, item.price)
     }
 
+    func testOwnStacksShowTheCurrentProfileAfterARename() {
+        let seed = MockSeedData()
+        let stack = seed.myStacks[0]
+        var renamed = seed.currentUser
+        renamed.displayName = "Neeha"
+        renamed.username = "neeha"
+
+        let shown = stack.showingCurrentProfile(renamed)
+        XCTAssertEqual(shown.author.displayName, "Neeha")
+        XCTAssertEqual(shown.author.username, "neeha")
+
+        let someoneElse = UserProfile(id: UUID(), displayName: "Owen", username: "owen", avatarURL: nil, bio: "", linkInBioURL: nil, isFollowing: false)
+        XCTAssertEqual(stack.showingCurrentProfile(someoneElse).author, stack.author)
+    }
+
     func testShareLinksOpenBrowserAndKeepLinkTokenForLinkOnlyStacks() {
         let seed = MockSeedData()
         var stack = seed.myStacks[0]

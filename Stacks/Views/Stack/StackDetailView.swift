@@ -74,12 +74,16 @@ struct StackDetailView: View {
         stackID = stack.id
     }
 
+    private var displayedStack: Stack {
+        viewModel.stack.showingCurrentProfile(session.currentUser)
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     StackViewerProductCanvas(
-                        stack: viewModel.stack,
+                        stack: displayedStack,
                         fadesClaimedItems: viewModel.stack.ownerID != session.currentUser?.id,
                         productTransition: productTransition,
                         onTap: { item in
@@ -104,7 +108,7 @@ struct StackDetailView: View {
 
             if isShowingStackSettings {
                 StackSettingsOverlay(
-                    stack: viewModel.stack,
+                    stack: displayedStack,
                     onDismiss: { isShowingStackSettings = false },
                     onSave: { title, visibility, wishlistMode in
                         Task {
@@ -168,7 +172,7 @@ struct StackDetailView: View {
         .background(Color.white.ignoresSafeArea())
         .safeAreaInset(edge: .top, spacing: 0) {
             StackViewerNavigationOverlay(
-                stack: viewModel.stack,
+                stack: displayedStack,
                 isOwner: isOwner,
                 canEdit: canEdit,
                 onBack: { dismiss() },
@@ -210,7 +214,7 @@ struct StackDetailView: View {
                     isShowingStackShare = true
                 },
                 onOpenProfile: {
-                    onOpenProfile(viewModel.stack.author)
+                    onOpenProfile(displayedStack.author)
                 },
                 onLeave: {
                     Task {
@@ -301,7 +305,7 @@ struct StackDetailView: View {
             }
         }
         .sheet(isPresented: $isShowingStackShare) {
-            StackSharePreviewSheet(stack: viewModel.stack, isOwner: isOwner) {
+            StackSharePreviewSheet(stack: displayedStack, isOwner: isOwner) {
                 if let url = viewModel.stack.shareURL { return url }
                 guard isOwner else { return nil }
                 await viewModel.updateSettings(
