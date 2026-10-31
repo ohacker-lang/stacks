@@ -135,7 +135,8 @@ struct OnboardingView: View {
                     OnboardingProfileSetupScreen(
                         profile: onboardingProfile,
                         email: onboardingEmail,
-                        onSave: saveOnboardingProfile
+                        onSave: saveOnboardingProfile,
+                        onBack: returnToSignIn
                     )
                     .transition(.opacity)
                 case .stackIt:
@@ -627,6 +628,7 @@ struct OnboardingView: View {
         guard case .onboarding(let authSession) = session.state else {
             return "Sign in is still finishing. Please try again in a moment."
         }
+        var saved: UserProfile
         do {
             var profile: UserProfile
             if let onboardingProfile {
@@ -636,15 +638,9 @@ struct OnboardingView: View {
             }
             profile.displayName = displayName
             profile.username = username
-            let saved = try await services.profiles.updateProfile(profile, avatarData: avatarData)
-            if let avatarData {
-                AvatarStore.save(avatarData, for: saved.id)
-            }
+            // Name and handle first, so a photo problem never loses them.
+            saved = try await services.profiles.updateProfile(profile, avatarData: nil)
             onboardingProfile = saved
-            Analytics.capture("profile_set_up", ["has_photo": avatarData != nil])
-            services.haptics.impact(.medium)
-            advanceToStackIt()
-            return nil
         } catch {
             services.haptics.notification(.error)
             let message = error.localizedDescription.lowercased()
@@ -652,7 +648,38 @@ struct OnboardingView: View {
             if message.contains("duplicate") || message.contains("unique") || message.contains("reserved") {
                 return "@\(username) is taken. Try another username."
             }
-            return "We couldn’t save your profile. Check your connection and try again."
+            if error is URLError {
+                return "You seem to be offline. Check your connection and try again."
+            }
+            return "We couldn’t save your profile. Please try again."
+        }
+
+        if let avatarData {
+            do {
+                saved = try await services.profiles.updateProfile(saved, avatarData: avatarData)
+                AvatarStore.save(avatarData, for: saved.id)
+                onboardingProfile = saved
+            } catch {
+                services.haptics.notification(.error)
+                return "Your name and @handle are saved, but the photo didn’t upload. Try another photo, or remove it to continue."
+            }
+        }
+
+        Analytics.capture("profile_set_up", ["has_photo": avatarData != nil])
+        services.haptics.impact(.medium)
+        advanceToStackIt()
+        return nil
+    }
+
+    /// Lets someone who signed in with the wrong account start again.
+    private func returnToSignIn() {
+        OnboardingKeyboard.dismiss()
+        Task {
+            await session.signOut()
+            onboardingProfile = nil
+            withAnimation(.easeInOut(duration: 0.3)) {
+                stage = .hero
+            }
         }
     }
 
@@ -785,6 +812,7 @@ private struct OnboardingProfileSetupScreen: View {
     let profile: UserProfile?
     let email: String?
     let onSave: (String, String, Data?) async -> String?
+    let onBack: () -> Void
 
     @State private var displayName = ""
     @State private var username = ""
@@ -852,7 +880,19 @@ private struct OnboardingProfileSetupScreen: View {
                     ) {
                         VStack(spacing: 14) {
                             photoPicker
-                                .padding(.bottom, 10)
+
+                            if avatarData != nil {
+                                Button("Remove photo") {
+                                    photoItem = nil
+                                    avatarData = nil
+                                    errorMessage = nil
+                                }
+                                .font(.stacksText(size: 13, weight: .regular))
+                                .foregroundStyle(Color.stacksMutedInk)
+                                .disabled(isSaving)
+                            }
+
+                            Color.clear.frame(height: 4)
 
                             OnboardingTextField(
                                 placeholder: "Your name",
@@ -888,6 +928,22 @@ private struct OnboardingProfileSetupScreen: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color.white.ignoresSafeArea())
+            .overlay(alignment: .topLeading) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.stacksInk)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
+                .padding(.leading, 16)
+                .padding(.top, proxy.safeAreaInsets.top + 4)
+                .accessibilityLabel("Back to sign in")
+                .accessibilityHint("Signs out so you can use a different account")
+                .accessibilityIdentifier("profile-setup-back")
+            }
         }
         .onChange(of: profile, initial: true) { _, profile in
             prefill(from: profile)
