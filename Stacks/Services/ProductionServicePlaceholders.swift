@@ -43,6 +43,27 @@ private actor SupabaseSessionStore {
     static let shared = SupabaseSessionStore()
     private let service = "spot.stacks.app.supabase"
     private let account = "current-session"
+    private var refreshTask: Task<StoredSupabaseSession, Error>?
+
+    /// Requests that find the token expiring all wait on one refresh. Six
+    /// parallel refreshes each rotated the refresh token, which risks Supabase
+    /// treating a stale one as reuse and signing the person out.
+    func sharedRefresh(
+        of session: StoredSupabaseSession,
+        perform: @escaping @Sendable (StoredSupabaseSession) async throws -> StoredSupabaseSession
+    ) async throws -> StoredSupabaseSession {
+        if let refreshTask {
+            return try await refreshTask.value
+        }
+        // Another caller already refreshed after this one read the old session.
+        if let stored = load(), stored.refreshToken != session.refreshToken {
+            return stored
+        }
+        let task = Task { try await perform(session) }
+        refreshTask = task
+        defer { refreshTask = nil }
+        return try await task.value
+    }
 
     func load() -> StoredSupabaseSession? {
         let query: [CFString: Any] = [
@@ -146,7 +167,9 @@ private struct SupabaseClient: Sendable {
         }
 
         if let expiresAt = session.expiresAt, expiresAt.timeIntervalSinceNow < 90 {
-            return try await refresh(session: session).accessToken
+            return try await sessionStore.sharedRefresh(of: session) { stale in
+                try await refresh(session: stale)
+            }.accessToken
         }
         return session.accessToken
     }
@@ -503,8 +526,11 @@ private struct SupabaseClient: Sendable {
             throw AppError.unavailable("Supabase did not return a valid response.")
         }
         guard (200...299).contains(httpResponse.statusCode) else {
-            let message = (try? decoder.decode(SupabaseErrorResponse.self, from: data))?.bestMessage
-            throw AppError.unavailable(message ?? "Supabase request failed (\(httpResponse.statusCode)).")
+            let response = try? decoder.decode(SupabaseErrorResponse.self, from: data)
+            throw AppError.unavailable(SupabaseErrorResponse.userFacingMessage(
+                response,
+                statusCode: httpResponse.statusCode
+            ))
         }
         return data
     }
@@ -966,12 +992,15 @@ struct SupabaseStackRepository: StackRepository {
                     URLQueryItem(name: "order", value: "updated_at.desc")
                 ]
             )
-            liveStacks = try await compose(rows: rows, viewerID: viewer.id)
+            // Empty Stacks (a just-made "test") aren't worth showing anyone.
+            liveStacks = try await compose(rows: rows, viewerID: viewer.id).filter { !$0.items.isEmpty }
         } catch {
             guard !curated.isEmpty else { throw error }
             liveStacks = []
         }
-        let stacks = (curated + liveStacks).sorted(by: discoverSort)
+        // Real members' Stacks replace the editorial ones; the curated
+        // catalog only fills Discover until someone has a public Stack.
+        let stacks = (liveStacks.isEmpty ? curated : liveStacks).sorted(by: discoverSort)
         guard let query, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return stacks }
         return stacks.filter {
             $0.title.localizedCaseInsensitiveContains(query)
@@ -980,7 +1009,16 @@ struct SupabaseStackRepository: StackRepository {
         }
     }
 
+    /// The founders' Stacks lead Discover while the community is small.
+    private static let featuredUsernames: [String] = ["neeha", "owen"]
+
     private func discoverSort(_ lhs: Stack, _ rhs: Stack) -> Bool {
+        let featured = Self.featuredUsernames
+        let lhsRank = featured.firstIndex(of: lhs.author.username.lowercased()) ?? featured.count
+        let rhsRank = featured.firstIndex(of: rhs.author.username.lowercased()) ?? featured.count
+        if lhsRank != rhsRank {
+            return lhsRank < rhsRank
+        }
         if lhs.isFollowingAuthor != rhs.isFollowingAuthor {
             return lhs.isFollowingAuthor
         }
@@ -1725,14 +1763,52 @@ private struct SupabaseErrorResponse: Decodable {
     let message: String?
     let error: String?
     let errorDescription: String?
+    /// PostgREST's Postgres error code, such as 42501 for a policy failure.
+    /// GoTrue sends a numeric HTTP code here instead, which is ignored.
+    let code: String?
 
     enum CodingKeys: String, CodingKey {
         case message
+        case msg
         case error
         case errorDescription = "error_description"
+        case code
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+            ?? container.decodeIfPresent(String.self, forKey: .msg)
+        error = try? container.decodeIfPresent(String.self, forKey: .error)
+        errorDescription = try container.decodeIfPresent(String.self, forKey: .errorDescription)
+        code = try? container.decodeIfPresent(String.self, forKey: .code)
     }
 
     var bestMessage: String? { message ?? errorDescription ?? error }
+
+    /// Database and gateway errors ("new row violates row-level security
+    /// policy…") were shown to people word for word. Keep messages that are
+    /// already meant for people, such as sign-in errors, and translate the rest.
+    static func userFacingMessage(_ response: Self?, statusCode: Int) -> String {
+        let raw = response?.bestMessage ?? ""
+        let lowered = raw.lowercased()
+        if lowered.contains("username") && (lowered.contains("duplicate") || lowered.contains("reserved")) {
+            return "That @handle is taken. Try another."
+        }
+        if statusCode == 401 || lowered.contains("jwt expired") {
+            return "Your session expired. Please sign in again."
+        }
+        if statusCode >= 500 {
+            return "Stacks is having trouble right now. Please try again in a moment."
+        }
+        if response?.code == "42501" || lowered.contains("row-level security") || lowered.contains("permission denied") {
+            return "You don't have access to do that. If it keeps happening, sign out and back in."
+        }
+        if response?.code?.count == 5 || lowered.contains("violates") || lowered.contains("constraint") || raw.isEmpty {
+            return "Something didn't save. Please try again."
+        }
+        return raw
+    }
 }
 
 private struct ProfileRow: Decodable {

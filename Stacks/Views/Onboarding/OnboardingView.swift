@@ -520,12 +520,7 @@ struct OnboardingView: View {
                     }
                     .frame(width: proxy.size.width, height: proxy.size.height)
 
-                    Button("Skip", action: completeOnboarding)
-                        .font(.stacksText(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.stacksMutedInk)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
+                    OnboardingSkipButton(action: completeOnboarding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, max(18, proxy.safeAreaInsets.bottom + 8))
                 }
@@ -651,7 +646,7 @@ struct OnboardingView: View {
             services.haptics.notification(.error)
             let message = error.localizedDescription.lowercased()
             // Postgres reports a taken or waitlist-reserved handle as a unique violation.
-            if message.contains("duplicate") || message.contains("unique") || message.contains("reserved") {
+            if message.contains("taken") || message.contains("duplicate") || message.contains("unique") || message.contains("reserved") {
                 return "@\(username) is taken. Try another username."
             }
             if error is URLError {
@@ -1462,6 +1457,9 @@ private struct FirstStackNameQuestion: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
+        // Riding up with the keyboard put Next on top of the title being
+        // typed. Keep the page still; the keyboard's Done key reveals Next.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
 
@@ -2498,9 +2496,11 @@ private struct SharedStackPreview: View {
             AbstractShareBubbleShape()
                 .fill(.ultraThinMaterial)
                 .overlay {
+                    // Lamps scroll behind this card, so it needs a solid
+                    // enough base for dark text to stay readable.
                     AbstractShareBubbleShape()
-                        .fill(Color.white.opacity(0.16))
-                        .stroke(Color.white.opacity(0.76), lineWidth: 1)
+                        .fill(Color.white.opacity(0.72))
+                        .stroke(Color.white.opacity(0.9), lineWidth: 1)
                 }
                 .shadow(color: .black.opacity(0.10), radius: 20, x: 0, y: 10)
 
@@ -2518,7 +2518,7 @@ private struct SharedStackPreview: View {
                     Text("Lamps for apt")
                         .font(.stacksMasthead(size: 21))
                         .tracking(-0.45)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.stacksInk)
                         .lineLimit(1)
 
                     Spacer(minLength: 0)
@@ -2538,11 +2538,12 @@ private struct SharedStackPreview: View {
                 HStack(spacing: 6) {
                     Image(systemName: "link")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("stacks.spot/aliva/lamps-for-apt")
+                    // Owen's own Stack, so the link uses his handle.
+                    Text("stacks.spot/owen/lamps-for-apt")
                         .font(.stacksText(size: 12, weight: .medium))
                     Spacer(minLength: 0)
                 }
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(Color.stacksMutedInk)
             }
             .padding(.horizontal, 19)
             .padding(.top, 17)
