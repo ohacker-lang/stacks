@@ -696,7 +696,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Stacks/Stacks.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 24H7V96T4Q;
 				ENABLE_PREVIEWS = YES;
@@ -710,7 +710,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan product barcodes to add the correct product listing to a Stack.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Find friends who use Stacks and make sharing and collaborating easier.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save a shareable image of your Stack to Photos.";
-				INFOPLIST_KEY_STACKS_GOOGLE_IOS_CLIENT_ID = "";
+				INFOPLIST_KEY_STACKS_GOOGLE_IOS_CLIENT_ID = "973771969161-7riifo3i6ur8uoi3coc7ndc88anfpmvm.apps.googleusercontent.com";
 				INFOPLIST_KEY_STACKS_POSTHOG_API_KEY = "";
 				INFOPLIST_KEY_STACKS_POSTHOG_HOST = "https://us.i.posthog.com";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
@@ -745,7 +745,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Stacks/Stacks.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = 24H7V96T4Q;
 				ENABLE_PREVIEWS = YES;
@@ -759,7 +759,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan product barcodes to add the correct product listing to a Stack.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Find friends who use Stacks and make sharing and collaborating easier.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save a shareable image of your Stack to Photos.";
-				INFOPLIST_KEY_STACKS_GOOGLE_IOS_CLIENT_ID = "";
+				INFOPLIST_KEY_STACKS_GOOGLE_IOS_CLIENT_ID = "973771969161-7riifo3i6ur8uoi3coc7ndc88anfpmvm.apps.googleusercontent.com";
 				INFOPLIST_KEY_STACKS_POSTHOG_API_KEY = "phc_n3ykcY2JRLNRmBKqWdKDsj4BdCLoxPYpwAogGLqYBMsL";
 				INFOPLIST_KEY_STACKS_POSTHOG_HOST = "https://us.i.posthog.com";
 				INFOPLIST_KEY_STACKS_PRODUCT_SEARCH_URL = "";
@@ -791,7 +791,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -814,7 +814,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -838,7 +838,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = StacksShareExtension/StacksShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 24H7V96T4Q;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StacksShareExtension/Info.plist;
@@ -864,7 +864,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = StacksShareExtension/StacksShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 24H7V96T4Q;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = StacksShareExtension/Info.plist;
