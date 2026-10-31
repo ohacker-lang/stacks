@@ -467,7 +467,7 @@ struct OnboardingView: View {
     }
 
     private func rotateHeroWords() async {
-        let words = ["things", "books", "shoes", "clothes", "furniture", "tech", "homeware", "gifts", "vinyl"]
+        let words = ["things", "books", "films", "shoes", "clothes", "furniture", "tech", "homeware", "gifts", "records"]
         var wordIndex = 0
 
         while !Task.isCancelled {
