@@ -13,6 +13,7 @@ protocol AuthService: Sendable {
     func signInWithGoogle() async throws -> AuthSession
     func signInWithEmail(_ email: String) async throws -> EmailAuthenticationResult
     func handleAuthCallback(_ url: URL) async throws -> AuthSession?
+    func verifyEmailCode(_ code: String, email: String) async throws -> AuthSession
     func recordLegalAcceptance(for userID: UUID, version: String) async throws
     func completeOnboarding(for userID: UUID) async throws
     func signOut() async throws

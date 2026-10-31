@@ -36,6 +36,8 @@ actor MockAuthService: AuthService {
             throw AppError.invalidEmail
         }
         try await Task.sleep(for: .milliseconds(450))
+        // Addresses starting with "code" exercise the emailed-code step.
+        if email.lowercased().hasPrefix("code") { return .linkSent }
         let session = AuthSession(
             userID: seed.currentUserID,
             email: email,
@@ -44,6 +46,19 @@ actor MockAuthService: AuthService {
         )
         self.session = session
         return .authenticated(session)
+    }
+
+    func verifyEmailCode(_ code: String, email: String) async throws -> AuthSession {
+        try await Task.sleep(for: .milliseconds(450))
+        guard code == "123456" else { throw AppError.unavailable("Invalid code.") }
+        let session = AuthSession(
+            userID: seed.currentUserID,
+            email: email,
+            displayName: seed.currentUser.displayName,
+            hasCompletedOnboarding: false
+        )
+        self.session = session
+        return session
     }
 
     func handleAuthCallback(_ url: URL) async throws -> AuthSession? {

@@ -114,7 +114,6 @@ struct OnboardingView: View {
     @State private var isLoadingFirstItemImport = false
     @State private var firstItemImportError: String?
     @State private var isAuthenticating = false
-    @State private var isShowingEmailCheckAlert = false
     @State private var isShowingProPaywall = false
     @State private var contactsAuthorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
     @State private var contactPreviews: [OnboardingContactPreview] = []
@@ -208,20 +207,19 @@ struct OnboardingView: View {
             switch destination {
             case .email:
                 EmailSignInSheet(onSubmit: { email in
-                    let didSignIn = await session.signInWithEmail(
+                    let didSend = await session.signInWithEmail(
                         email,
                         acceptingLegalTerms: true
                     )
-                    if didSignIn {
-                        if session.pendingEmailSignIn {
-                            isShowingEmailCheckAlert = true
-                        } else {
-                            advanceToProfileSetup()
-                        }
+                    guard didSend else {
+                        let message = session.lastError
+                        session.lastError = nil
+                        return .failed(message)
                     }
-                    return didSignIn
+                    return session.pendingEmailSignIn ? .codeSent : .signedIn
+                }, onVerifyCode: { code, email in
+                    await session.verifyEmailCode(code, email: email)
                 }, onCancel: returnToHeroAfterCancelledSignIn)
-                .presentationDetents([.height(194)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(30)
                 .presentationBackground(.ultraThinMaterial)
@@ -233,10 +231,18 @@ struct OnboardingView: View {
         .fullScreenCover(isPresented: $isShowingProPaywall, onDismiss: finishOnboarding) {
             StacksProPaywall()
         }
-        .alert("Check your email", isPresented: $isShowingEmailCheckAlert) {
+        // Sign-in failures land in session.lastError; show them here so a
+        // failed Apple, Google or email link never looks like nothing happened.
+        .alert(
+            "Couldn’t sign in",
+            isPresented: Binding(
+                get: { sheet == nil && session.lastError != nil },
+                set: { if !$0 { session.lastError = nil } }
+            )
+        ) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Open the secure Stacks sign-in link we sent you. You’ll return here automatically.")
+            Text(session.lastError ?? "")
         }
         .overlay {
             if isShowingFirstItemPhotoLibrary {
@@ -359,7 +365,7 @@ struct OnboardingView: View {
 
             ZStack(alignment: .bottom) {
                 VStack(spacing: 0) {
-                    (Text("Collect ").font(.stacksOnboardingSerif(size: titleSize))
+                    (Text("Stack ").font(.stacksOnboardingSerif(size: titleSize))
                         + Text("your").font(.stacksOnboardingSerif(size: titleSize)).italic()
                         + Text("\n\(heroWord)").font(.stacksOnboardingSerif(size: titleSize)))
                         .foregroundStyle(Color.stacksInk)
@@ -461,7 +467,7 @@ struct OnboardingView: View {
     }
 
     private func rotateHeroWords() async {
-        let words = ["things", "wishlists", "clothes", "tech", "internet", "shoes"]
+        let words = ["things", "books", "shoes", "clothes", "furniture", "tech", "homeware", "gifts", "vinyl"]
         var wordIndex = 0
 
         while !Task.isCancelled {

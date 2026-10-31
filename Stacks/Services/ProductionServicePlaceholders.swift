@@ -343,6 +343,28 @@ private struct SupabaseClient: Sendable {
         return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
     }
 
+    func verifyEmailOTP(email: String, token: String) async throws -> AuthSession {
+        let body = try encoder.encode(["type": "email", "email": email, "token": token])
+        let data = try await request(
+            url: configuration.projectURL.appending(path: "auth/v1/verify"),
+            method: "POST",
+            body: body,
+            authenticated: false
+        )
+        return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
+    }
+
+    func exchangeGoogleIdentityToken(_ identityToken: String, nonce: String) async throws -> AuthSession {
+        let body = try encoder.encode(["provider": "google", "id_token": identityToken, "nonce": nonce])
+        let data = try await request(
+            url: tokenURL(grantType: "id_token"),
+            method: "POST",
+            body: body,
+            authenticated: false
+        )
+        return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
+    }
+
     /// `appending(path:)` would percent-encode a `?` into the path, so the
     /// grant type goes in as a real query item.
     private func tokenURL(grantType: String) -> URL {
@@ -621,6 +643,13 @@ struct SupabaseAuthService: AuthService {
     }
 
     func signInWithGoogle() async throws -> AuthSession {
+        // With an iOS client ID, Google's own sheet names the app "Stacks".
+        // Without one, fall back to Supabase's web flow, where Google shows
+        // the Supabase project domain instead.
+        if let clientID = configuredString(for: "STACKS_GOOGLE_IOS_CLIENT_ID") {
+            let credential = try await GoogleNativeSignIn.authorize(clientID: clientID)
+            return try await client.exchangeGoogleIdentityToken(credential.idToken, nonce: credential.rawNonce)
+        }
         let authorization = try await client.googleOAuthAuthorizationURL()
         let callbackURL = try await OAuthSignInAuthorizer.authorize(
             url: authorization.url,
@@ -666,6 +695,12 @@ struct SupabaseAuthService: AuthService {
         ))
     }
 
+    func verifyEmailCode(_ code: String, email: String) async throws -> AuthSession {
+        let digits = code.filter(\.isNumber)
+        guard !digits.isEmpty else { throw AppError.missingRequiredField("Code") }
+        return try await client.verifyEmailOTP(email: email, token: digits)
+    }
+
     func recordLegalAcceptance(for userID: UUID, version: String) async throws {
         try await client.recordLegalAcceptance(id: userID, version: version)
     }
@@ -683,6 +718,79 @@ struct SupabaseAuthService: AuthService {
         struct DeleteResponse: Decodable { let deleted: Bool? }
         _ = try await client.function("delete-account", body: EmptyRequest()) as DeleteResponse
         try await client.signOut()
+    }
+}
+
+/// Google sign-in with the iOS OAuth client: PKCE in an
+/// ASWebAuthenticationSession, then the ID token goes to Supabase. Google's
+/// consent screen shows the app's name rather than the Supabase domain.
+private enum GoogleNativeSignIn {
+    struct Credential {
+        let idToken: String
+        let rawNonce: String
+    }
+
+    private struct TokenResponse: Decodable {
+        let idToken: String?
+
+        enum CodingKeys: String, CodingKey {
+            case idToken = "id_token"
+        }
+    }
+
+    static func authorize(clientID: String) async throws -> Credential {
+        // Google's iOS redirect scheme is the client ID reversed.
+        let scheme = clientID.split(separator: ".").reversed().joined(separator: ".")
+        let redirectURI = "\(scheme):/oauth2redirect"
+        let verifier = PKCE.verifier()
+        let state = PKCE.verifier()
+        let rawNonce = PKCE.verifier()
+        let hashedNonce = CryptoKit.SHA256.hash(data: Data(rawNonce.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+
+        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")
+        components?.queryItems = [
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "redirect_uri", value: redirectURI),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "openid email profile"),
+            URLQueryItem(name: "code_challenge", value: PKCE.challenge(for: verifier)),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "nonce", value: hashedNonce),
+            URLQueryItem(name: "prompt", value: "select_account")
+        ]
+        guard let url = components?.url else { throw AppError.invalidURL }
+
+        let callbackURL = try await OAuthSignInAuthorizer.authorize(url: url, callbackScheme: scheme)
+        let query = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        if query.first(where: { $0.name == "error" })?.value == "access_denied" {
+            throw CancellationError()
+        }
+        guard query.first(where: { $0.name == "state" })?.value == state,
+              let code = query.first(where: { $0.name == "code" })?.value else {
+            throw AppError.unavailable("Google sign-in didn't finish. Please try again.")
+        }
+
+        var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        var form = URLComponents()
+        form.queryItems = [
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "code_verifier", value: verifier),
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "redirect_uri", value: redirectURI)
+        ]
+        request.httpBody = form.percentEncodedQuery?.data(using: .utf8)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let idToken = try JSONDecoder().decode(TokenResponse.self, from: data).idToken else {
+            throw AppError.unavailable("Google sign-in didn't finish. Please try again.")
+        }
+        return Credential(idToken: idToken, rawNonce: rawNonce)
     }
 }
 
