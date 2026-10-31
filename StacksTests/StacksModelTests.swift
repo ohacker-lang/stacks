@@ -472,7 +472,9 @@ final class StacksModelTests: XCTestCase {
 
         let preview = ProductPageImageExtractor.preview(in: html, sourceURL: sourceURL)
 
-        XCTAssertEqual(preview.title, "Always Pan - Vanilla Bean")
+        // Titles drop the shade after " - " (see the Rhode titles test); the
+        // shared variant still decides the photo.
+        XCTAssertEqual(preview.title, "Always Pan")
         XCTAssertEqual(preview.imageURL?.absoluteString, "https://cdn.example.com/vanilla-1200.jpg")
     }
 

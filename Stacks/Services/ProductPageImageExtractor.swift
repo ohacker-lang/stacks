@@ -360,6 +360,7 @@ enum ProductPageImageExtractor {
         let cleaned = slug
             .replacingOccurrences(of: ".html", with: "", options: .caseInsensitive)
             .replacingOccurrences(of: "^[0-9]{4,}[-_]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "[-_][0-9]{5,}$", with: "", options: .regularExpression)
             .replacingOccurrences(of: "[-_][A-Za-z0-9]{9,}$", with: "", options: .regularExpression)
             .replacingOccurrences(of: "-", with: " ")
             .replacingOccurrences(of: "_", with: " ")

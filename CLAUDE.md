@@ -47,10 +47,13 @@ key, PostHog `phc_` key, Apple team ID.
 ## Build and test
 
 ```bash
-xcodebuild -project Stacks.xcodeproj -scheme Stacks -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath build/DerivedData build CODE_SIGNING_ALLOWED=NO
+xcodebuild -project Stacks.xcodeproj -scheme Stacks -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath build/DerivedData -allowProvisioningUpdates build
 ```
 
 - Offline demo account: launch the app with environment variable
   `STACKS_PRO_LOCAL_STOREKIT=1` (Debug builds).
 - Unit tests: same command with `test` instead of `build`.
+- Keep signing on (no `CODE_SIGNING_ALLOWED=NO`): unsigned builds have no
+  app group or Keychain, so share-queue tests fail and sign-in can't save
+  its session in the simulator.
 - Website tests: `cd web && npm test`.
