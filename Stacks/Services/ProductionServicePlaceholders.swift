@@ -391,7 +391,8 @@ private struct SupabaseClient: Sendable {
               let jpegData = image.jpegData(compressionQuality: 0.86) else {
             throw AppError.unavailable("We couldn't prepare that profile photo. Try another image.")
         }
-        let path = "\(ownerID.uuidString)/avatar.jpg"
+        // Storage policies compare the folder with auth.uid(), which is lowercase.
+        let path = "\(ownerID.uuidString.lowercased())/avatar.jpg"
         try await uploadData(jpegData, bucket: "profile-media", path: path, contentType: "image/jpeg")
         return path
     }
@@ -1252,7 +1253,8 @@ struct SupabaseStackRepository: StackRepository {
         uploadsRemoved: Bool
     ) async throws -> ItemWrite {
         let user = try await client.authUser()
-        let prefix = "\(user.id.uuidString)/\(stackID.uuidString)/\(item.id.uuidString)"
+        // Storage policies compare the first folder with auth.uid(), which is lowercase.
+        let prefix = "\(user.id.uuidString.lowercased())/\(stackID.uuidString)/\(item.id.uuidString)"
         var originalPath: String?
         var removedPath: String?
 
