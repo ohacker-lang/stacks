@@ -440,8 +440,10 @@ struct HomeView: View {
         var ids = pinnedStackIDs
         if ids.contains(stack.id.uuidString) {
             ids.remove(stack.id.uuidString)
+            Analytics.capture("stack_unpinned")
         } else {
             ids.insert(stack.id.uuidString)
+            Analytics.capture("stack_pinned")
         }
         pinnedStackIDStore = ids.sorted().joined(separator: ",")
         services.haptics.impact(.light)
