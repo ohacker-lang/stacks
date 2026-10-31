@@ -13,6 +13,7 @@ struct AppServices: @unchecked Sendable {
     let storage: any StorageService
     let realtime: any RealtimeService
     let safety: any SafetyService
+    let priceAlerts: any PriceAlertService
     let haptics: HapticsService
 
     static func mock() -> AppServices {
@@ -30,6 +31,7 @@ struct AppServices: @unchecked Sendable {
             storage: MockStorageService(),
             realtime: MockRealtimeService(),
             safety: MockSafetyService(),
+            priceAlerts: MockPriceAlertService(stacks: stackRepository),
             haptics: HapticsService()
         )
     }
@@ -50,6 +52,7 @@ struct AppServices: @unchecked Sendable {
             storage: SupabaseStorageService(),
             realtime: SupabaseRealtimeService(),
             safety: SupabaseSafetyService(configuration: configuration),
+            priceAlerts: SupabasePriceAlertService(),
             haptics: HapticsService()
         )
     }
@@ -77,6 +80,7 @@ struct AppServices: @unchecked Sendable {
             storage: storage,
             realtime: realtime,
             safety: safety,
+            priceAlerts: priceAlerts,
             haptics: haptics
         )
     }

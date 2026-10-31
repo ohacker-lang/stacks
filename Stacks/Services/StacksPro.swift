@@ -383,6 +383,12 @@ struct PriceAlertEvent: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+struct PriceAlertListing: Decodable, Sendable {
+    let alerts: [PriceAlert]
+    let events: [PriceAlertEvent]
+    let notificationsEnabled: Bool
+}
+
 enum PriceAlertError: LocalizedError {
     case proRequired
     case unavailable(String)
@@ -403,6 +409,11 @@ final class PriceAlertCenter {
     private(set) var isLoading = false
     var errorMessage: String?
     private var accountID: UUID?
+    private let service: any PriceAlertService
+
+    init(service: any PriceAlertService) {
+        self.service = service
+    }
 
     var unreadEventCount: Int { events.lazy.filter { $0.readAt == nil }.count }
     func alert(for itemID: UUID) -> PriceAlert? { alerts.first { $0.stackItemID == itemID } }
@@ -419,7 +430,7 @@ final class PriceAlertCenter {
         isLoading = true
         defer { isLoading = false }
         do {
-            let listing = try await SupabasePriceAlertService().list()
+            let listing = try await service.list()
             alerts = listing.alerts
             events = listing.events
             notificationsEnabled = listing.notificationsEnabled
@@ -429,7 +440,7 @@ final class PriceAlertCenter {
 
     func save(itemID: UUID, mode: PriceAlertMode, targetPrice: Decimal?, linkToken: UUID? = nil) async throws {
         do {
-            try await SupabasePriceAlertService().save(itemID: itemID, mode: mode, targetPrice: targetPrice, linkToken: linkToken)
+            try await service.save(itemID: itemID, mode: mode, targetPrice: targetPrice, linkToken: linkToken)
             await refresh()
         } catch {
             if error.localizedDescription.localizedCaseInsensitiveContains("Pro is required") {
@@ -439,16 +450,16 @@ final class PriceAlertCenter {
         }
     }
 
-    func delete(_ alert: PriceAlert) async throws { try await SupabasePriceAlertService().delete(alertID: alert.id); await refresh() }
+    func delete(_ alert: PriceAlert) async throws { try await service.delete(alertID: alert.id); await refresh() }
     func setPaused(_ paused: Bool, alert: PriceAlert) async throws {
-        try await SupabasePriceAlertService().setPaused(paused, alertID: alert.id); await refresh()
+        try await service.setPaused(paused, alertID: alert.id); await refresh()
     }
     func setNotificationsEnabled(_ enabled: Bool) async throws {
-        try await SupabasePriceAlertService().setNotificationsEnabled(enabled)
+        try await service.setNotificationsEnabled(enabled)
         notificationsEnabled = enabled
     }
     func markRead(_ event: PriceAlertEvent) async {
-        try? await SupabasePriceAlertService().markRead(eventID: event.id)
+        try? await service.markRead(eventID: event.id)
         if let index = events.firstIndex(where: { $0.id == event.id }) { events[index].readAt = .now }
     }
 
