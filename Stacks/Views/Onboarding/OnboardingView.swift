@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import CoreMotion
 import Contacts
+import PhotosUI
 
 private enum OnboardingKeyboard {
     @MainActor
@@ -17,6 +18,7 @@ private enum OnboardingKeyboard {
 
 private enum OnboardingStage: Equatable {
     case hero
+    case profile
     case stackIt
     case saveAnywhere
     case shareIt
@@ -129,6 +131,13 @@ struct OnboardingView: View {
                 switch stage {
                 case .hero:
                     hero
+                case .profile:
+                    OnboardingProfileSetupScreen(
+                        profile: onboardingProfile,
+                        email: onboardingEmail,
+                        onSave: saveOnboardingProfile
+                    )
+                    .transition(.opacity)
                 case .stackIt:
                     PhysicsExplainerScreen(
                         title: "Stack your finds",
@@ -206,7 +215,7 @@ struct OnboardingView: View {
                         if session.pendingEmailSignIn {
                             isShowingEmailCheckAlert = true
                         } else {
-                            advanceToStackIt()
+                            advanceToProfileSetup()
                         }
                     }
                     return didSignIn
@@ -321,6 +330,13 @@ struct OnboardingView: View {
             guard stage == .friends else { return }
             refreshContactAuthorization()
         }
+        // An email link, or relaunching mid-onboarding, arrives already signed
+        // in; skip the sign-in buttons and go straight to profile setup.
+        .onChange(of: session.state, initial: true) { _, state in
+            guard case .onboarding = state else { return }
+            sheet = nil
+            advanceToProfileSetup()
+        }
     }
 
     private var hero: some View {
@@ -381,7 +397,7 @@ struct OnboardingView: View {
                             )
                             isAuthenticating = false
                             if didSignIn {
-                                advanceToStackIt()
+                                advanceToProfileSetup()
                             }
                         }
                     }
@@ -397,7 +413,7 @@ struct OnboardingView: View {
                             )
                             isAuthenticating = false
                             if didSignIn {
-                                advanceToStackIt()
+                                advanceToProfileSetup()
                             }
                         }
                     } label: {
@@ -593,8 +609,55 @@ struct OnboardingView: View {
         Task { await session.completeOnboarding() }
     }
 
-    private func advanceToStackIt() {
+    private var onboardingEmail: String? {
+        guard case .onboarding(let authSession) = session.state else { return nil }
+        return authSession.email
+    }
+
+    private func advanceToProfileSetup() {
         guard stage == .hero else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            stage = .profile
+        }
+        loadOnboardingProfileIfNeeded()
+    }
+
+    /// Returns a message to show under the form, or nil once saved.
+    private func saveOnboardingProfile(displayName: String, username: String, avatarData: Data?) async -> String? {
+        guard case .onboarding(let authSession) = session.state else {
+            return "Sign in is still finishing. Please try again in a moment."
+        }
+        do {
+            var profile: UserProfile
+            if let onboardingProfile {
+                profile = onboardingProfile
+            } else {
+                profile = try await services.profiles.currentProfile(for: authSession)
+            }
+            profile.displayName = displayName
+            profile.username = username
+            let saved = try await services.profiles.updateProfile(profile, avatarData: avatarData)
+            if let avatarData {
+                AvatarStore.save(avatarData, for: saved.id)
+            }
+            onboardingProfile = saved
+            Analytics.capture("profile_set_up", ["has_photo": avatarData != nil])
+            services.haptics.impact(.medium)
+            advanceToStackIt()
+            return nil
+        } catch {
+            services.haptics.notification(.error)
+            let message = error.localizedDescription.lowercased()
+            // Postgres reports a taken or waitlist-reserved handle as a unique violation.
+            if message.contains("duplicate") || message.contains("unique") || message.contains("reserved") {
+                return "@\(username) is taken. Try another username."
+            }
+            return "We couldn’t save your profile. Check your connection and try again."
+        }
+    }
+
+    private func advanceToStackIt() {
+        guard stage == .profile else { return }
         // Keep the stage swap immediate. The physics field is the transition:
         // the same hero products launch into the newly visible Stack canvas.
         burstMultiplier = 1
@@ -712,6 +775,226 @@ struct OnboardingView: View {
     private func returnToHeroAfterCancelledSignIn() {
         if stage != .hero {
             withAnimation(.easeOut(duration: 0.2)) { stage = .hero }
+        }
+    }
+}
+
+/// First step after sign-in: the name, @handle and optional photo people see.
+/// New accounts start with a placeholder handle, so this step can't be skipped.
+private struct OnboardingProfileSetupScreen: View {
+    let profile: UserProfile?
+    let email: String?
+    let onSave: (String, String, Data?) async -> String?
+
+    @State private var displayName = ""
+    @State private var username = ""
+    @State private var photoItem: PhotosPickerItem?
+    @State private var avatarData: Data?
+    @State private var hasPrefilled = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case name
+        case username
+    }
+
+    static let usernameLength = 3...30
+
+    private var trimmedName: String {
+        displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The handle as saved: lowercase, without a leading @ or stray spaces.
+    private var normalizedUsername: String {
+        var value = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if value.hasPrefix("@") { value.removeFirst() }
+        return value
+    }
+
+    private var hasInvalidCharacters: Bool {
+        !normalizedUsername.allSatisfy { Self.allowedUsernameCharacters.contains($0) }
+    }
+
+    private var canContinue: Bool {
+        !trimmedName.isEmpty
+            && Self.usernameLength.contains(normalizedUsername.count)
+            && !hasInvalidCharacters
+            && !isSaving
+    }
+
+    private var showsProblem: Bool {
+        errorMessage != nil || hasInvalidCharacters || normalizedUsername.count > Self.usernameLength.upperBound
+    }
+
+    private var usernameHint: String {
+        if normalizedUsername.isEmpty {
+            "Letters, numbers and underscores"
+        } else if hasInvalidCharacters {
+            "Only letters, numbers and underscores"
+        } else if normalizedUsername.count < Self.usernameLength.lowerBound {
+            "At least 3 characters"
+        } else if normalizedUsername.count > Self.usernameLength.upperBound {
+            "30 characters at most"
+        } else {
+            "stacks.spot/\(normalizedUsername)"
+        }
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    FirstStackQuestion(
+                        title: "Make it yours",
+                        detail: "This is how friends find you\nand see your Stacks."
+                    ) {
+                        VStack(spacing: 14) {
+                            photoPicker
+                                .padding(.bottom, 10)
+
+                            OnboardingTextField(
+                                placeholder: "Your name",
+                                text: $displayName,
+                                contentType: .name,
+                                autocapitalization: .words
+                            )
+                            .focused($focusedField, equals: .name)
+                            .submitLabel(.next)
+                            .onSubmit { focusedField = .username }
+                            .accessibilityLabel("Display name")
+
+                            usernameField
+
+                            Text(errorMessage ?? usernameHint)
+                                .font(.stacksText(size: 14, weight: showsProblem ? .semibold : .regular))
+                                .foregroundStyle(showsProblem ? Color.red : Color.stacksMutedInk)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 6)
+                                .accessibilityIdentifier("profile-setup-hint")
+                        }
+                    } primary: {
+                        PrimaryButton(title: "Continue", systemImage: "arrow.right", isLoading: isSaving, action: save)
+                            .disabled(!canContinue)
+                            .opacity(canContinue || isSaving ? 1 : 0.42)
+                            .accessibilityIdentifier("profile-setup-continue")
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, proxy.safeAreaInsets.top + 36)
+                    .padding(.bottom, 24)
+                }
+                .frame(minHeight: proxy.size.height, alignment: .top)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color.white.ignoresSafeArea())
+        }
+        .onChange(of: profile, initial: true) { _, profile in
+            prefill(from: profile)
+        }
+        .onChange(of: username) { _, _ in
+            errorMessage = nil
+        }
+        .task(id: photoItem) {
+            guard let photoItem,
+                  let data = try? await photoItem.loadTransferable(type: Data.self) else { return }
+            avatarData = data
+        }
+    }
+
+    private var photoPicker: some View {
+        PhotosPicker(selection: $photoItem, matching: .images) {
+            VStack(spacing: 8) {
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let avatarData, let image = UIImage(data: avatarData) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 38, weight: .medium))
+                                .foregroundStyle(Color.stacksMutedInk)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.stacksInk.opacity(0.06))
+                        }
+                    }
+                    .frame(width: 96, height: 96)
+                    .clipShape(Circle())
+
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color.stacksInk, in: Circle())
+                        .overlay(Circle().stroke(.white, lineWidth: 2))
+                }
+
+                Text(avatarData == nil ? "Add a photo (optional)" : "Change photo")
+                    .font(.stacksText(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.stacksMutedInk)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(avatarData == nil ? "Add a profile photo" : "Change profile photo")
+    }
+
+    private var usernameField: some View {
+        HStack(spacing: 2) {
+            Text("@")
+                .font(.stacksText(size: 17, weight: .semibold))
+                .foregroundStyle(Color.stacksMutedInk)
+            TextField("username", text: $username)
+                .font(.stacksText(size: 17, weight: .regular))
+                .foregroundStyle(Color.stacksInk)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textContentType(.username)
+                .focused($focusedField, equals: .username)
+                .submitLabel(.done)
+                .onSubmit { if canContinue { save() } }
+                .accessibilityLabel("Username")
+        }
+        .padding(.horizontal, 18)
+        .frame(height: 58)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(showsProblem ? Color.red.opacity(0.6) : Color.stacksInk.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    /// Fills in what sign-in already told us, but never the placeholder handle
+    /// or a name that is just the email address's first half.
+    private func prefill(from profile: UserProfile?) {
+        guard !hasPrefilled, let profile else { return }
+        hasPrefilled = true
+        let emailPrefix = email?.split(separator: "@").first.map { String($0).lowercased() }
+        if displayName.isEmpty, profile.displayName.lowercased() != emailPrefix, profile.displayName != "New member" {
+            displayName = profile.displayName
+        }
+        if username.isEmpty, !profile.username.hasPrefix("stacker_"), profile.username.lowercased() != emailPrefix {
+            username = profile.username.lowercased()
+        }
+        if avatarData == nil {
+            avatarData = AvatarStore.data(for: profile.id)
+        }
+    }
+
+    /// Matches the database rule for handles.
+    static let allowedUsernameCharacters = Set("abcdefghijklmnopqrstuvwxyz0123456789_")
+
+    private func save() {
+        guard canContinue else { return }
+        OnboardingKeyboard.dismiss()
+        isSaving = true
+        errorMessage = nil
+        let name = String(trimmedName.prefix(80))
+        let handle = normalizedUsername
+        let photo = photoItem == nil ? nil : avatarData
+        Task {
+            errorMessage = await onSave(name, handle, photo)
+            isSaving = false
         }
     }
 }
