@@ -133,7 +133,8 @@ final class DiscoverViewModel {
 
     var matchingCreators: [UserProfile] {
         guard searchScope == .usernames else { return [] }
-        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        var normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedQuery.hasPrefix("@") { normalizedQuery.removeFirst() }
         guard !normalizedQuery.isEmpty else { return [] }
         var seen = Set<UUID>()
         let creators = suggestedCreators + stacks.map(\.author)
@@ -203,7 +204,11 @@ final class DiscoverViewModel {
 
     func toggleFollow(authorID: UUID, services: AppServices, user: UserProfile) async {
         do {
+            let wasFollowing = suggestedCreators.first { $0.id == authorID }?.isFollowing
+                ?? stacks.first { $0.author.id == authorID }?.isFollowingAuthor
+                ?? false
             let updatedStacks = try await services.stacks.toggleFollow(authorID: authorID, userID: user.id)
+            Analytics.capture(wasFollowing ? "creator_unfollowed" : "creator_followed", ["source": "discover"])
             for index in suggestedCreators.indices where suggestedCreators[index].id == authorID {
                 suggestedCreators[index].isFollowing.toggle()
             }

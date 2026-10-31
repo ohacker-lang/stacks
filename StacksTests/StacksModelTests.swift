@@ -216,6 +216,35 @@ final class StacksModelTests: XCTestCase {
         XCTAssertEqual(stack.showingCurrentProfile(someoneElse).author, stack.author)
     }
 
+    func testDemoFollowCountsMatchTheListsAndFollowing() async throws {
+        let seed = MockSeedData()
+        let stacks = MockStackRepository(seed: seed)
+        let profiles = MockProfileRepository(seed: seed, stacks: stacks)
+        let me = seed.currentUserID
+
+        let before = try await profiles.followCounts(profileID: me)
+        let followers = try await profiles.followList(profileID: me, kind: .followers)
+        XCTAssertEqual(before.followers, followers.count)
+
+        let discover = try await stacks.fetchDiscoverStacks(query: nil)
+        let stack = try XCTUnwrap(discover.first)
+        let author = stack.author
+        _ = try await stacks.toggleFollow(authorID: author.id, userID: me)
+        let nowFollowing = !stack.isFollowingAuthor
+
+        let after = try await profiles.followCounts(profileID: me)
+        XCTAssertEqual(after.following, before.following + (nowFollowing ? 1 : -1))
+        let following = try await profiles.followList(profileID: me, kind: .following)
+        XCTAssertEqual(following.contains { $0.id == author.id }, nowFollowing)
+        let theirFollowers = try await profiles.followList(profileID: author.id, kind: .followers)
+        XCTAssertEqual(theirFollowers.map(\.id), nowFollowing ? [me] : [])
+    }
+
+    @MainActor
+    func testNewProfileDoesNotStartWithAFakeFollower() {
+        XCTAssertEqual(ProfileViewModel().followerCount, 0)
+    }
+
     func testShareLinksOpenBrowserAndKeepLinkTokenForLinkOnlyStacks() {
         let seed = MockSeedData()
         var stack = seed.myStacks[0]

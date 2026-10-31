@@ -154,11 +154,10 @@ struct AnalyticsStackRepository: StackRepository {
         return stack
     }
 
+    // Follow events are captured by the Follow buttons, which know the
+    // direction and where the tap came from (docs/ANALYTICS.md).
     func toggleFollow(authorID: UUID, userID: UUID) async throws -> [Stack] {
-        let stacks = try await base.toggleFollow(authorID: authorID, userID: userID)
-        let following = stacks.first { $0.ownerID == authorID }?.isFollowingAuthor
-        if let following { Analytics.capture(following ? "creator_followed" : "creator_unfollowed") }
-        return stacks
+        try await base.toggleFollow(authorID: authorID, userID: userID)
     }
 }
 

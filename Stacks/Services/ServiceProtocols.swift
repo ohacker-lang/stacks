@@ -49,6 +49,21 @@ protocol ProfileRepository: Sendable {
     func disableProfileSharing() async throws
     func suggestedCreators() async throws -> [UserProfile]
     func searchCreators(query: String) async throws -> [UserProfile]
+    func followCounts(profileID: UUID) async throws -> FollowCounts
+    func followList(profileID: UUID, kind: FollowListKind) async throws -> [UserProfile]
+}
+
+struct FollowCounts: Equatable, Sendable {
+    var followers: Int
+    var following: Int
+}
+
+enum FollowListKind: String, Identifiable, Sendable {
+    case followers
+    case following
+
+    var id: Self { self }
+    var title: String { self == .followers ? "Followers" : "Following" }
 }
 
 protocol ProductSearchService: Sendable {

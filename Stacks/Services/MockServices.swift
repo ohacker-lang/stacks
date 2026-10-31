@@ -242,6 +242,13 @@ actor MockStackRepository: StackRepository {
         return updated
     }
 
+    func followedAuthors() -> [UserProfile] {
+        var seen = Set<UUID>()
+        return (discoverStacks + myStacks).filter(\.isFollowingAuthor).compactMap { stack in
+            seen.insert(stack.author.id).inserted ? stack.author : nil
+        }
+    }
+
     func item(id: UUID) -> StackItem? {
         myStacks.lazy.flatMap(\.items).first { $0.id == id }
     }
@@ -333,11 +340,41 @@ actor MockStackRepository: StackRepository {
 
 actor MockProfileRepository: ProfileRepository {
     private let seed: MockSeedData
+    private let stacks: MockStackRepository?
     private var currentProfile: UserProfile
 
-    init(seed: MockSeedData) {
+    init(seed: MockSeedData, stacks: MockStackRepository? = nil) {
         self.seed = seed
+        self.stacks = stacks
         currentProfile = seed.currentUser
+    }
+
+    // The demo account is followed by Isabella and follows whoever the demo
+    // Stacks say it follows, so counts and lists always agree.
+    func followCounts(profileID: UUID) async throws -> FollowCounts {
+        async let followers = followList(profileID: profileID, kind: .followers)
+        async let following = followList(profileID: profileID, kind: .following)
+        return try await FollowCounts(followers: followers.count, following: following.count)
+    }
+
+    func followList(profileID: UUID, kind: FollowListKind) async throws -> [UserProfile] {
+        let followed = await stacks?.followedAuthors() ?? []
+        if profileID == currentProfile.id {
+            switch kind {
+            case .followers:
+                var isabella = seed.isabella
+                isabella.isFollowing = followed.contains { $0.id == isabella.id }
+                return [isabella]
+            case .following:
+                return followed
+            }
+        }
+        switch kind {
+        case .followers:
+            return followed.contains { $0.id == profileID } ? [currentProfile] : []
+        case .following:
+            return profileID == seed.isabellaID ? [currentProfile] : []
+        }
     }
 
     func currentProfile(for session: AuthSession) async throws -> UserProfile {

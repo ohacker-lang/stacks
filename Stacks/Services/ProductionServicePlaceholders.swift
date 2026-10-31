@@ -1576,36 +1576,28 @@ struct SupabaseProfileRepository: ProfileRepository {
         }
     }
 
+    // Every profile is public, so search covers everyone who finished
+    // onboarding, not just Discover opt-ins (search_profiles).
     func searchCreators(query: String) async throws -> [UserProfile] {
-        let user = try await client.authUser()
-        let cleanQuery = query
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .filter { $0.isLetter || $0.isNumber || $0 == " " || $0 == "_" || $0 == "-" }
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanQuery.isEmpty else { return try await suggestedCreators() }
+        let body = try JSONEncoder().encode(["search_text": cleanQuery])
+        let data = try await client.restData("rpc/search_profiles", method: "POST", body: body)
+        return try client.decoder.decode([ProfileRow].self, from: data).map { $0.profile(using: client.configuration) }
+    }
 
-        let profiles: [ProfileRow] = try await client.rest(
-            "profiles",
-            query: [
-                URLQueryItem(name: "discovery_enabled", value: "eq.true"),
-                URLQueryItem(name: "id", value: "neq.\(user.id.uuidString)"),
-                URLQueryItem(name: "or", value: "(display_name.ilike.*\(cleanQuery)*,username.ilike.*\(cleanQuery)*)"),
-                URLQueryItem(name: "select", value: "*"),
-                URLQueryItem(name: "limit", value: "20")
-            ]
-        )
-        let follows: [FollowRow] = try await client.rest(
-            "follows",
-            query: [
-                URLQueryItem(name: "follower_id", value: "eq.\(user.id.uuidString)"),
-                URLQueryItem(name: "select", value: "followed_user_id")
-            ]
-        )
-        let followed = Set(follows.compactMap(\.followedUserID))
-        return profiles.map { row in
-            var profile = row.profile(using: client.configuration)
-            profile.isFollowing = followed.contains(row.id)
-            return profile
-        }
+    func followCounts(profileID: UUID) async throws -> FollowCounts {
+        struct Row: Decodable { let followers: Int; let following: Int }
+        let body = try JSONEncoder().encode(["target_user": profileID])
+        let data = try await client.restData("rpc/profile_follow_counts", method: "POST", body: body)
+        let row = try client.decoder.decode([Row].self, from: data).first
+        return FollowCounts(followers: row?.followers ?? 0, following: row?.following ?? 0)
+    }
+
+    func followList(profileID: UUID, kind: FollowListKind) async throws -> [UserProfile] {
+        let body = try JSONEncoder().encode(["target_user": profileID.uuidString, "list_kind": kind.rawValue])
+        let data = try await client.restData("rpc/profile_follow_list", method: "POST", body: body)
+        return try client.decoder.decode([ProfileRow].self, from: data).map { $0.profile(using: client.configuration) }
     }
 }
 
@@ -1837,9 +1829,11 @@ private struct ProfileRow: Decodable {
     let linkInBioURL: String?
     let onboardingCompletedAt: Date?
     let profileShareEnabled: Bool?
+    let isFollowing: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
+        case isFollowing = "is_following"
         case displayName = "display_name"
         case username
         case avatarPath = "avatar_path"
@@ -1857,7 +1851,7 @@ private struct ProfileRow: Decodable {
             avatarURL: avatarPath.flatMap { Self.publicAvatarURL(path: $0, configuration: configuration) },
             bio: bio,
             linkInBioURL: linkInBioURL.flatMap(URL.init(string:)),
-            isFollowing: false,
+            isFollowing: isFollowing ?? false,
             profileShareEnabled: profileShareEnabled
         )
     }
