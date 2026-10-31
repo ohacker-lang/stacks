@@ -57,11 +57,14 @@ private final class StacksAppDelegate: NSObject, UIApplicationDelegate, UNUserNo
 @main
 struct StacksApp: App {
     @UIApplicationDelegateAdaptor(StacksAppDelegate.self) private var appDelegate
-    @State private var session = AppSession(services: .configured())
+    @State private var session: AppSession
     @State private var pro = StacksPro()
-    @State private var priceAlerts = PriceAlertCenter()
+    @State private var priceAlerts: PriceAlertCenter
 
     init() {
+        let services = AppServices.configured()
+        _session = State(initialValue: AppSession(services: services))
+        _priceAlerts = State(initialValue: PriceAlertCenter(service: services.priceAlerts))
         StacksFontRegistration.registerBundledFonts()
         pro.configure()
     }

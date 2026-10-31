@@ -599,13 +599,7 @@ struct SupabasePushTokenService: Sendable {
     }
 }
 
-struct SupabasePriceAlertService: Sendable {
-    struct Listing: Decodable, Sendable {
-        let alerts: [PriceAlert]
-        let events: [PriceAlertEvent]
-        let notificationsEnabled: Bool
-    }
-
+struct SupabasePriceAlertService: PriceAlertService {
     private struct Request: Encodable {
         let action: String
         var itemID: UUID?
@@ -626,7 +620,7 @@ struct SupabasePriceAlertService: Sendable {
         return SupabaseClient(configuration: configuration)
     }
 
-    func list() async throws -> Listing {
+    func list() async throws -> PriceAlertListing {
         try await client().function("price-alerts", body: Request(action: "list"))
     }
 

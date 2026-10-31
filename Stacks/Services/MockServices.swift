@@ -234,9 +234,16 @@ actor MockStackRepository: StackRepository {
             throw AppError.notFound
         }
         var updated = stack
+        // Every Stack row has a link token from the moment it exists, so a
+        // wishlist switched to link sharing can be shared straight away.
+        updated.publicLinkToken = updated.publicLinkToken ?? myStacks[index].publicLinkToken ?? UUID()
         updated.updatedAt = Date()
         myStacks[index] = updated
         return updated
+    }
+
+    func item(id: UUID) -> StackItem? {
+        myStacks.lazy.flatMap(\.items).first { $0.id == id }
     }
 
     func rotateWishlistLink(stackID: UUID, revoke: Bool) async throws -> Stack {
@@ -547,6 +554,70 @@ actor MockStorageService: StorageService {
         try data.write(to: url, options: [.atomic])
         return url
     }
+}
+
+/// Keeps demo price alerts in memory. The price never moves, so no events.
+actor MockPriceAlertService: PriceAlertService {
+    private let stacks: MockStackRepository
+    private var alerts: [PriceAlert] = []
+    private var notificationsEnabled = true
+
+    init(stacks: MockStackRepository) {
+        self.stacks = stacks
+    }
+
+    func list() async throws -> PriceAlertListing {
+        PriceAlertListing(alerts: alerts, events: [], notificationsEnabled: notificationsEnabled)
+    }
+
+    func save(itemID: UUID, mode: PriceAlertMode, targetPrice: Decimal?, linkToken: UUID?) async throws {
+        if let index = alerts.firstIndex(where: { $0.stackItemID == itemID }) {
+            alerts[index].mode = mode
+            alerts[index].targetPrice = targetPrice
+            alerts[index].status = .active
+            return
+        }
+        guard let item = await stacks.item(id: itemID) else { throw AppError.notFound }
+        alerts.append(PriceAlert(
+            id: UUID(),
+            stackItemID: itemID,
+            mode: mode,
+            targetPrice: targetPrice,
+            currencyCode: item.currencyCode,
+            baselinePrice: item.price,
+            currentPrice: item.price,
+            lowestPrice: item.price,
+            status: .active,
+            nextCheckAt: Date().addingTimeInterval(24 * 60 * 60),
+            lastCheckedAt: Date(),
+            lastSuccessAt: Date(),
+            lastError: nil,
+            createdAt: Date(),
+            product: PriceAlert.Product(
+                title: item.title,
+                brand: item.brand,
+                removedBackgroundImagePath: item.removedBackgroundImageURL?.absoluteString,
+                originalImagePath: item.originalImageURL?.absoluteString,
+                buyURL: item.buyURL.absoluteString,
+                sourceURL: item.sourceURL.absoluteString
+            )
+        ))
+    }
+
+    func delete(alertID: UUID) async throws {
+        alerts.removeAll { $0.id == alertID }
+    }
+
+    func setPaused(_ paused: Bool, alertID: UUID) async throws {
+        guard let index = alerts.firstIndex(where: { $0.id == alertID }) else { throw AppError.notFound }
+        alerts[index].status = paused ? .paused : .active
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool) async throws {
+        notificationsEnabled = enabled
+    }
+
+    func markRead(eventID: UUID) async throws {}
 }
 
 actor MockRealtimeService: RealtimeService {

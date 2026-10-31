@@ -106,3 +106,12 @@ protocol SafetyService: Sendable {
     func reportProfile(id: UUID, reason: String) async throws
     func blockUser(id: UUID) async throws
 }
+
+protocol PriceAlertService: Sendable {
+    func list() async throws -> PriceAlertListing
+    func save(itemID: UUID, mode: PriceAlertMode, targetPrice: Decimal?, linkToken: UUID?) async throws
+    func delete(alertID: UUID) async throws
+    func setPaused(_ paused: Bool, alertID: UUID) async throws
+    func setNotificationsEnabled(_ enabled: Bool) async throws
+    func markRead(eventID: UUID) async throws
+}

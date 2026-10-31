@@ -166,6 +166,41 @@ final class StacksModelTests: XCTestCase {
         XCTAssertEqual(stack.ownerID, seed.currentUserID)
     }
 
+    func testDemoWishlistGetsAShareLinkWhenSwitchedToLinkSharing() async throws {
+        let seed = MockSeedData()
+        let repository = MockStackRepository(seed: seed)
+        var stack = try await repository.createStack(
+            title: "Birthday Ideas",
+            wishlistMode: true,
+            visibility: .private,
+            owner: seed.currentUser
+        )
+        XCTAssertNil(stack.shareURL)
+
+        stack.visibility = .publicLink
+        let shared = try await repository.updateStack(stack)
+
+        let token = try XCTUnwrap(shared.publicLinkToken)
+        XCTAssertEqual(shared.shareURL?.host(), "stacks.spot")
+        XCTAssertEqual(shared.shareURL?.query(), "token=\(token.uuidString)")
+    }
+
+    func testDemoPriceAlertsSaveWithoutTheBackend() async throws {
+        let seed = MockSeedData()
+        let repository = MockStackRepository(seed: seed)
+        let alerts = MockPriceAlertService(stacks: repository)
+        let stacks = try await repository.fetchMyStacks(for: seed.currentUserID)
+        let item = try XCTUnwrap(stacks.first { !$0.items.isEmpty }?.items.first)
+
+        try await alerts.save(itemID: item.id, mode: .target, targetPrice: 10, linkToken: nil)
+        let listing = try await alerts.list()
+
+        XCTAssertEqual(listing.alerts.count, 1)
+        XCTAssertEqual(listing.alerts.first?.stackItemID, item.id)
+        XCTAssertEqual(listing.alerts.first?.targetPrice, 10)
+        XCTAssertEqual(listing.alerts.first?.currentPrice, item.price)
+    }
+
     func testOwnStacksShowTheCurrentProfileAfterARename() {
         let seed = MockSeedData()
         let stack = seed.myStacks[0]
