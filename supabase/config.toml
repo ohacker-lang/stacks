@@ -50,6 +50,11 @@ verify_jwt = true
 [functions.web-preview]
 verify_jwt = false
 
+# Signs in the App Review account with a fixed code. Callers have no session
+# yet; the function itself refuses anything but the review email and code.
+[functions.review-sign-in]
+verify_jwt = false
+
 [functions.sync-pro-entitlement]
 verify_jwt = true
 

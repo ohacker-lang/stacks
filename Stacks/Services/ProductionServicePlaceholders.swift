@@ -377,6 +377,19 @@ private struct SupabaseClient: Sendable {
         return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
     }
 
+    /// The App Review account signs in with a fixed code checked by the
+    /// review-sign-in function, since reviewers can't read its email.
+    func verifyReviewCode(email: String, code: String) async throws -> AuthSession {
+        let body = try encoder.encode(["email": email, "code": code])
+        let data = try await request(
+            url: configuration.projectURL.appending(path: "functions/v1/review-sign-in"),
+            method: "POST",
+            body: body,
+            authenticated: false
+        )
+        return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
+    }
+
     func exchangeGoogleIdentityToken(_ identityToken: String, nonce: String) async throws -> AuthSession {
         let body = try encoder.encode(["provider": "google", "id_token": identityToken, "nonce": nonce])
         let data = try await request(
@@ -724,7 +737,17 @@ struct SupabaseAuthService: AuthService {
     func verifyEmailCode(_ code: String, email: String) async throws -> AuthSession {
         let digits = code.filter(\.isNumber)
         guard !digits.isEmpty else { throw AppError.missingRequiredField("Code") }
-        return try await client.verifyEmailOTP(email: email, token: digits)
+        do {
+            return try await client.verifyEmailOTP(email: email, token: digits)
+        } catch let emailError {
+            // Only the review account has a fixed code; for everyone else
+            // the function says no and the email code's error stands.
+            do {
+                return try await client.verifyReviewCode(email: email, code: digits)
+            } catch {
+                throw emailError
+            }
+        }
     }
 
     func recordLegalAcceptance(for userID: UUID, version: String) async throws {
