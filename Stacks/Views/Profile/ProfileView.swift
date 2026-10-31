@@ -96,8 +96,10 @@ struct ProfileView: View {
         session.currentUser?.id == profile.id
     }
 
+    // Your own profile follows the signed-in profile, so a change made
+    // anywhere (onboarding, Edit profile) shows here straight away.
     private var presentedProfile: UserProfile {
-        isCurrentProfile ? editableProfile : profile
+        isCurrentProfile ? (session.currentUser ?? editableProfile) : profile
     }
 
     var body: some View {
@@ -167,6 +169,7 @@ struct ProfileView: View {
                     avatarData = newAvatarData
                     AvatarStore.save(newAvatarData, for: profile.id)
                 }
+                let previous = presentedProfile
                 guard let updated = session.updateCurrentProfile(
                     displayName: displayName,
                     username: username,
@@ -174,9 +177,16 @@ struct ProfileView: View {
                 ) else { return }
                 editableProfile = updated
                 Task {
-                    if let saved = try? await services.profiles.updateProfile(updated, avatarData: newAvatarData) {
+                    do {
+                        let saved = try await services.profiles.updateProfile(updated, avatarData: newAvatarData)
                         editableProfile = saved
                         session.replaceCurrentProfile(with: saved)
+                    } catch {
+                        // Keep the app on what the server has, or screens drift
+                        // from the name and link everyone else sees.
+                        editableProfile = previous
+                        session.replaceCurrentProfile(with: previous)
+                        safetyMessage = error.localizedDescription
                     }
                 }
             }

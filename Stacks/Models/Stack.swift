@@ -82,3 +82,19 @@ enum StackVisibility: String, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 }
+
+extension Stack {
+    /// Stacks carry a copy of their author from when they were loaded. Swap in
+    /// the signed-in profile so a rename shows on your own Stacks right away.
+    func showingCurrentProfile(_ user: UserProfile?) -> Stack {
+        guard let user else { return self }
+        var stack = self
+        if stack.author.id == user.id { stack.author = user }
+        stack.collaborators = stack.collaborators.map { collaborator in
+            var collaborator = collaborator
+            if collaborator.user.id == user.id { collaborator.user = user }
+            return collaborator
+        }
+        return stack
+    }
+}
