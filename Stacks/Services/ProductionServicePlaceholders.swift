@@ -305,14 +305,13 @@ private struct SupabaseClient: Sendable {
         let body = try encoder.encode(SupabaseOTPRequest(
             email: email,
             createUser: true,
-            options: SupabaseOTPOptions(
-                emailRedirectTo: configuration.redirectURL.absoluteString,
-                codeChallenge: challenge,
-                codeChallengeMethod: "s256"
-            )
+            codeChallenge: challenge,
+            codeChallengeMethod: "s256"
         ))
+        // GoTrue reads the email link's redirect from the query string, not the body.
         _ = try await request(
-            url: configuration.projectURL.appending(path: "auth/v1/otp"),
+            url: configuration.projectURL.appending(path: "auth/v1/otp")
+                .appending(queryItems: [URLQueryItem(name: "redirect_to", value: configuration.redirectURL.absoluteString)]),
             method: "POST",
             body: body,
             authenticated: false
@@ -325,7 +324,7 @@ private struct SupabaseClient: Sendable {
         }
         let body = try encoder.encode(["auth_code": code, "code_verifier": verifier])
         let data = try await request(
-            url: configuration.projectURL.appending(path: "auth/v1/token?grant_type=pkce"),
+            url: tokenURL(grantType: "pkce"),
             method: "POST",
             body: body,
             authenticated: false
@@ -336,12 +335,19 @@ private struct SupabaseClient: Sendable {
     func exchangeAppleIdentityToken(_ identityToken: String) async throws -> AuthSession {
         let body = try encoder.encode(["provider": "apple", "id_token": identityToken])
         let data = try await request(
-            url: configuration.projectURL.appending(path: "auth/v1/token?grant_type=id_token"),
+            url: tokenURL(grantType: "id_token"),
             method: "POST",
             body: body,
             authenticated: false
         )
         return try await saveAuthResponse(decoder.decode(SupabaseAuthResponse.self, from: data))
+    }
+
+    /// `appending(path:)` would percent-encode a `?` into the path, so the
+    /// grant type goes in as a real query item.
+    private func tokenURL(grantType: String) -> URL {
+        configuration.projectURL.appending(path: "auth/v1/token")
+            .appending(queryItems: [URLQueryItem(name: "grant_type", value: grantType)])
     }
 
     func googleOAuthAuthorizationURL() async throws -> (url: URL, callbackScheme: String) {
@@ -1578,22 +1584,12 @@ private struct UserMetadata: Decodable {
 private struct SupabaseOTPRequest: Encodable {
     let email: String
     let createUser: Bool
-    let options: SupabaseOTPOptions
-
-    enum CodingKeys: String, CodingKey {
-        case email
-        case createUser = "create_user"
-        case options
-    }
-}
-
-private struct SupabaseOTPOptions: Encodable {
-    let emailRedirectTo: String
     let codeChallenge: String
     let codeChallengeMethod: String
 
     enum CodingKeys: String, CodingKey {
-        case emailRedirectTo = "email_redirect_to"
+        case email
+        case createUser = "create_user"
         case codeChallenge = "code_challenge"
         case codeChallengeMethod = "code_challenge_method"
     }
